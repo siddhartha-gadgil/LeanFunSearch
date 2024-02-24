@@ -13,8 +13,7 @@ jobs:
         run: |
           set -o pipefail
           sudo apt install -y elan
-          echo "$HOME/.elan/bin" >> $GITHUB_PATH
-          echo | source $HOME/.profile && $HOME/.elan/bin/elan --version
+          elan --version
 
       - uses: actions/checkout@v4
 
