@@ -14,6 +14,9 @@ jobs:
           set -o pipefail
           sudo apt install -y elan
           elan --version
+          elan default leanprover/lean4:v4.5.0
+          elan update
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
 
       - uses: actions/checkout@v4
 
