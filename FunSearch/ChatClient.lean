@@ -7,27 +7,13 @@ open Lean Meta
 structure ChatParams where
   n : Nat := 1
   temp : JsonNumber := 0.2
-  stopTokens : Array String :=  #[":=", "-/", "\n\n"]
+  stopTokens : Array String :=  #[]
   model : String := "gpt-3.5-turbo"
   max_tokens : Nat := 1600
 
 namespace ChatParams
 def stopColEq (params: ChatParams) : Bool :=
   params.stopTokens.contains ":="
-
-def splitOutputs (params: ChatParams)
-  (outputs : Array String) : Array String :=
-  if stopColEq params then
-    outputs
-  else
-    let outs := outputs.toList.bind colEqSegments
-    outs.toArray
-
-def noStop (p: ChatParams) : ChatParams :=
-  {p with stopTokens := #["\n\n"]}
-
-def withoutStop (p: ChatParams)(stopless: Bool) : ChatParams :=
-  if stopless then noStop p else p
 
 end ChatParams
 
@@ -74,8 +60,6 @@ def query (server: ChatServer)(messages : Json)(params : ChatParams) : CoreM Jso
   trace[Translate.info] "Model query: {data}"
   let url ← server.url
   let authHeader? ← server.authHeader?
-  -- IO.eprintln s!"Querying {url} at {← IO.monoMsNow }"
-  -- let start ← IO.monoMsNow
   let baseArgs :=
     #[url, "-X", "POST", "-H", "Content-Type: application/json"]
   let args := match authHeader? with
@@ -87,7 +71,6 @@ def query (server: ChatServer)(messages : Json)(params : ChatParams) : CoreM Jso
     ("url", Json.str url),
     ("arguments", Json.arr <| baseArgs.map (Json.str)),
     ("data", data)]
-  -- IO.eprintln s!"Received response from {url} at {← IO.monoMsNow }; time taken: {(← IO.monoMsNow) - start}"
   match Lean.Json.parse output with
   | Except.ok j =>
     appendLog "chat_queries"
@@ -109,40 +92,3 @@ def ChatExample.messages (ex : ChatExample) : List Json :=
     Json.mkObj [("role", "assistant"), ("content", ex.assistant)]]
 
 abbrev ToChatExample := String × Json → Option ChatExample
-
-def simpleChatExample : ToChatExample
-  | (docString, data) => data.getObjValAs? String "theorem" |>.toOption.map fun thm => {user := docString, assistant:= thm}
-
-def fullTheorem (js: Json) : Option String := do
-  let thm ← js.getObjValAs? String "theorem" |>.toOption
-  let name ← js.getObjValAs? String "name" |>.toOption
-  let isProp ← js.getObjValAs? Bool "isProp" |>.toOption
-  return if isProp then
-    s!"theorem {name} : {thm} := by sorry"
-  else
-    s!"def {name} : {thm} := sorry"
-
-def displaydDoc (doc: String)(isProp: Bool) : String :=
-  if (isProp) then s!"Consider the mathematical theorem.
-**Theorem:**
-{doc}
----
-Translate the above mathematical statement into a Lean 4 `theorem` with proof `by sorry`. Give the Lean code only"
-  else s!"Consider the mathematical definition.
-**Definition:**
-{doc}
----
-Translate the above mathematical definition into a Lean 4 `def` with value `by sorry`. Give the Lean code only"
-
-
-def docChatExample
-  (fullThm: Bool := false)(fullDoc : Bool := false) : ToChatExample
-  | (docString, data) =>
-    do
-    let thm ← data.getObjValAs? String "theorem" |>.toOption
-    let name ← data.getObjValAs? String "name" |>.toOption
-    let isProp ← data.getObjValAs? Bool "isProp" |>.toOption
-    let user := if fullDoc then displaydDoc docString isProp else
-      docString
-    let assistant := if fullThm then s!"theorem {name} : {thm} := by sorry" else thm
-    return {user := user, assistant := assistant}
