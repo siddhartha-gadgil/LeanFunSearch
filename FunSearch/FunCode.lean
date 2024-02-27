@@ -1,6 +1,7 @@
 import FunSearch.ChatClient
+import FunSearch.Frontend
 import Lean.Data.Json
-open Lean
+open Lean Elab Term
 
 structure FunCode where
   funName: Name
@@ -11,7 +12,9 @@ structure FunCode where
 def formatLines (lines: List String) : String :=
   lines.foldl (fun acc x => acc ++ "\n" ++ x) ""
 
-def FunCode.instructions (code: FunCode) : List String :=
+namespace FunCode
+
+def instructions (code: FunCode) : List String :=
   let matchLines : List String :=
   match code.matchData? with
     | some (data : Json) =>
@@ -27,17 +30,58 @@ def FunCode.instructions (code: FunCode) : List String :=
     "```"
   ]
 
+def get? (code: String)(funName: Name) :
+  TermElabM <| Except String FunCode := do
+  let code := leanBlock code.trim
+  let values? ← runDefsViewM? code [funName, `loss, `matchData]
+  match values? with
+  | Except.error e => return Except.error e
+  | Except.ok values =>
+    let funName ← getConstInfo funName
+    let loss? := values.find? `loss
+    let matchData? := values.find? `matchData
+    match loss? with
+    | none => return Except.error "Expected loss to be defined"
+    | some lossString =>
+    match parseFloat lossString with
+    | Except.error e =>
+      return Except.error s!"Error {e} while parsing loss {lossString}"
+    | Except.ok loss =>
+      let funCode : FunCode :=
+      {
+        funName := funName.name,
+        code := code,
+        loss := loss,
+        matchData? := matchData?
+    }
+      return Except.ok funCode
+
+def getAll (codes: Array String)(funName: Name) :
+  TermElabM <| (Array FunCode) := do
+  let mut funCodes := #[]
+  for code in codes do
+    let funCode? ← get? code funName
+    match funCode? with
+    | Except.error e =>
+      appendLog "elab_errors" <|
+        Json.mkObj [("error", e), ("code", code), ("funName", funName.toString)]
+      pure ()
+    | Except.ok funCode => funCodes := funCodes.push funCode
+  return funCodes
+
 def codeInstructions (funName: Name)
   (codeSamples: List FunCode) : String :=
   let sampleInstructions :=
     codeSamples.bind (fun code => code.instructions)
   let head :=
-    s!"Generate code in Lean 4 to \
-      minimize the **loss** for the function {funName}\
+    s!"Generate code in Lean 4 for the function {funName}\
+      to minimize the associated **loss**. \
       \
     Some implementations of the function are given below \
-    along with their **loss** and possibly match data indicating\
-    expected and actual outputs of some functions\
-    defined in terms of {funName}."
+    along with their **loss**. In some cases there is\
+    match data indicating expected and actual outputs of some functions\
+    depending on the function {funName}."
 
   formatLines (head :: sampleInstructions)
+
+end FunCode

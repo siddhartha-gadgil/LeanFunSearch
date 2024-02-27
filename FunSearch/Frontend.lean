@@ -60,6 +60,21 @@ def runDefsViewM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM 
     return (n, fmt.pretty)
   return (HashMap.ofList fmts, logs)
 
+def runDefsViewM? (s: String)(names: List Name)(modifyEnv: Bool := false):
+  MetaM <| Except String (HashMap Name String) := do
+  let (vals, logs) ← runDefsViewM s names modifyEnv
+  let mut hasErrors : Bool := false
+  let mut l := []
+  for msg in logs.toList do
+      if msg.severity == MessageSeverity.error then
+        let x ← msg.data.toString
+        l := l.append [x]
+        hasErrors := true
+  if hasErrors then
+    return Except.error <| "Errors found: " ++ l.toString
+  else
+    return Except.ok vals
+
 def checkElabFrontM(s: String) : MetaM <| List String := do
   let (_, log) ← runFrontendM s
   let mut l := []
