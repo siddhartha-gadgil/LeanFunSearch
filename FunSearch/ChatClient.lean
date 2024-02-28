@@ -6,7 +6,7 @@ open Lean Meta
 
 structure ChatParams where
   n : Nat := 1
-  temp : JsonNumber := 0.2
+  temp : JsonNumber := 0.8
   stopTokens : Array String :=  #[]
   model : String := "gpt-3.5-turbo"
   max_tokens : Nat := 1600

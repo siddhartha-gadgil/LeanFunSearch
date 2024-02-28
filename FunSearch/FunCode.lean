@@ -56,21 +56,22 @@ def get? (code: String)(funName: Name) :
     }
       return Except.ok funCode
 
-def getAll (codes: Array String)(funName: Name) :
+def getAll (codes: Array String)(tailCode: String)(funName: Name) :
   TermElabM <| (Array FunCode) := do
   let mut funCodes := #[]
   for code in codes do
-    let funCode? ← get? code funName
+    let funCode? ← get? (code ++ tailCode) funName
     match funCode? with
     | Except.error e =>
       appendLog "elab_errors" <|
-        Json.mkObj [("error", e), ("code", code), ("funName", funName.toString)]
+        Json.mkObj [("error", e), ("code", code), ("funName", funName.toString), ("tailCode", tailCode)]
       pure ()
     | Except.ok funCode => funCodes := funCodes.push funCode
   return funCodes
 
 def codeInstructions (funName: Name)
-  (codeSamples: List FunCode) : String :=
+  (codeSamples: List FunCode)(matchData: Bool := false)
+  (properties: List String := []) : String :=
   let sampleInstructions :=
     codeSamples.bind (fun code => code.instructions)
   let head :=
@@ -78,10 +79,13 @@ def codeInstructions (funName: Name)
       to minimize the associated **loss**. \
       \
     Some implementations of the function are given below \
-    along with their **loss**. In some cases there is\
-    match data indicating expected and actual outputs of some functions\
-    depending on the function {funName}."
-
-  formatLines (head :: sampleInstructions)
+    along with their **loss**."
+  let head :=
+    if matchData then
+      head ++
+      " The match data gives expected and actual outputs of some functions\
+       that depend on the function {funName}."
+    else head
+  formatLines (head :: properties ++ sampleInstructions)
 
 end FunCode

@@ -76,26 +76,18 @@ def appendFile (fname : FilePath) (content : String) : IO Unit := do
   h.putStrLn content
   h.flush
 
-def appendLog (logFile: String) (content : Json) : IO Unit := do
-  let dir : FilePath := "rawdata"
-  if !(← dir.pathExists) then
-    IO.FS.createDirAll dir
-  let fname : FilePath := "rawdata/" / ("log_" ++ logFile ++ ".jsonl")
-  appendFile fname content.compress
-
 def gitHash : IO String := do
   let hash ← IO.Process.output { cmd := "git", args := #["rev-parse", "--short", "HEAD"] }
   return hash.stdout.trim
 
-def colEqSegments (s: String) : List String :=
-  let pieces := s.splitOn ":="
-  match pieces with
-  | [] => []
-  | head :: tail =>
-    tail.scanl (fun acc x => acc ++ ":=" ++ x) head |>.map (String.trim)
-
-def splitColEqSegments (ss: Array String) : Array String :=
-  ss.toList.bind colEqSegments |>.toArray
+def appendLog (logFile: String) (content : Json) : IO Unit := do
+  let dir : FilePath := "logs"
+  if !(← dir.pathExists) then
+    IO.FS.createDirAll dir
+  let fullContent := Json.mkObj [("git_hast", (← gitHash))
+                                , ("content", content)]
+  let fname : FilePath := "logs/" / (logFile ++ ".jsonl")
+  appendFile fname fullContent.compress
 
 def leanBlock (s: String) : String :=
   let fullSplit := s.splitOn "```lean"
