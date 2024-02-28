@@ -17,7 +17,7 @@ structure ChatParams where
 inductive ChatServer where
   | openAI
   | azure (deployment: String := "leanaide-gpt4-32")
-  | generic (url: String) (hasSystem : Bool := true)
+  | generic (url: String) (hasSystemMessage : Bool := true)
 
 namespace ChatServer
 
@@ -29,7 +29,7 @@ def url : ChatServer → IO String
   | generic url _ =>
       return url++"/v1/chat/completions"
 
-def hasSystem : ChatServer → Bool
+def hasSystemMessage : ChatServer → Bool
   | openAI => true
   | azure _ => true
   | generic _ b => b
@@ -112,7 +112,7 @@ def stringsFromJson (json: Json) : CoreM (Array String) := do
         pure parsedArr
     | Except.error e => throwError m!"json parsing error: {e}"
 
-def queryTexts (server: ChatServer)(messages : Json)
+def queryTextsForMessages (server: ChatServer)(messages : Json)
     (params : ChatParams) : CoreM <| Array String := do
   let response ← server.query messages params
   stringsFromJson response
@@ -122,12 +122,16 @@ def sysPrompt: String := "You are a Lean prover and Mathematics assistant. Give 
 
 def messages (server: ChatServer) (instructions: String)  : CoreM Json := do
   let main := Json.mkObj [("role", "user"), ("content", instructions)]
-  if server.hasSystem then
+  if server.hasSystemMessage then
     let system := Json.mkObj [("role", "system"), ("content", sysPrompt)]
     return Json.arr #[system, main]
   else
     return Json.arr #[main]
 
+def queryTexts (server: ChatServer) (instructions: String)
+    (params : ChatParams) : CoreM (Array String) := do
+  let messages ← server.messages instructions
+  queryTextsForMessages server messages params
 
 end ChatServer
 

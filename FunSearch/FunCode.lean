@@ -10,6 +10,9 @@ structure FunCode where
   code: String
   loss: Float
   matchData? : Option Json
+  deriving BEq
+
+#synth BEq FunCode
 
 def formatLines (lines: List String) : String :=
   lines.foldl (fun acc x => acc ++ "\n" ++ x) ""
