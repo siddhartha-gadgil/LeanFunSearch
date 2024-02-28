@@ -4,8 +4,10 @@ open Lean Meta Elab Parser PrettyPrinter Term
 
 /-!
 Code generation from declarations to include in the search space.
-This does not work well for `match` expressions, so it is best to just
-read from source files with annotations.
+This does not work well for `match` expressions, so it is better to
+not use this for LLM sample code.
+
+It can, however, be useful for *tail code* for `loss` and `matchData`.
 -/
 namespace funsearch
 

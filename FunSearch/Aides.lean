@@ -47,14 +47,16 @@ def appendLog (logFile: String) (content : Json) : IO Unit := do
   appendFile fname fullContent.compress
 
 def leanBlock (s: String) : String :=
-  let fullSplit := s.splitOn "```lean"
-  let split := if fullSplit.length > 1
-    then fullSplit.get! 1 else
-    s.splitOn "```" |>.get! 1
-  split.splitOn "```" |>.get! 0
+  let tail :=
+    s.splitOn "```lean" |>.getD 1 <|
+      s.splitOn "```" |>.getD 1 s
+  tail.splitOn "```" |>.get! 0
 
 -- code of Adam Topaz
 def parseFloat (s : String) : Except String Float :=
   match Lean.Json.parse s with
     | .ok (.num t) => .ok t.toFloat
     | _ => throw "Failed to parse as float."
+
+def enclosedBlocks (start stop: String) (s: String) : List String :=
+  s.splitOn start |>.tail |>.map (fun s => s.splitOn stop |>.get! 0)
