@@ -4,6 +4,8 @@ import FunSearch.Aides
 
 open Lean Meta
 
+namespace funsearch
+
 structure ChatParams where
   n : Nat := 1
   temp : JsonNumber := 0.8

@@ -3,6 +3,8 @@ import FunSearch.Frontend
 import Lean.Data.Json
 open Lean Elab Term
 
+namespace funsearch
+
 structure FunCode where
   funName: Name
   code: String
