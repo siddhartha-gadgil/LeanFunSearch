@@ -41,7 +41,7 @@ def appendLog (logFile: String) (content : Json) : IO Unit := do
   let dir : FilePath := "logs"
   if !(← dir.pathExists) then
     IO.FS.createDirAll dir
-  let fullContent := Json.mkObj [("git_hast", (← gitHash))
+  let fullContent := Json.mkObj [("git_hash", (← gitHash))
                                 , ("content", content)]
   let fname : FilePath := "logs/" / (logFile ++ ".jsonl")
   appendFile fname fullContent.compress
@@ -60,3 +60,35 @@ def parseFloat (s : String) : Except String Float :=
 
 def enclosedBlocks (start stop: String) (s: String) : List String :=
   s.splitOn start |>.tail |>.map (fun s => s.splitOn stop |>.get! 0)
+
+#check List.splitOnP
+#check IO.FS.lines
+
+def enclosedLineBlocks (start stop: String) (lines : List String):
+  List (List String) :=
+  lines.splitOnP (fun s => (s.splitOn start).length > 1) |>.tail
+  |>.map (fun ss => ss.takeWhile (fun s => (s.splitOn stop).length ≤  1))
+
+#eval enclosedLineBlocks "```lean" "```" ["import", "```lean", "a", "b", "```", "c", "```lean", "d", "```", "e"]
+
+#eval enclosedLineBlocks "<details>" "</details>" ["import", "-- <details>", "a", "b", "-- </details>", "c", "-- <details>", "d", "-- </details>", "e"]
+
+/-- Extracts blocks to be used as sample code from a file. These should be enclosed in `<funsearch>` and `</funsearch>` tags. Generally these will
+be in comments, e.g. `-- <funsearch>`. The lines containing the tags are not included in the output.
+-/
+def funBlocks (path: System.FilePath) : IO (List String) := do
+  let lines ← IO.FS.lines path
+  let blocks := enclosedLineBlocks "<funsearch>" "</funsearch>" lines.toList
+  return blocks.map
+    (fun ss => ss.foldl (fun s1 s2 => s1 ++ "\n" ++ s2) "")
+
+def enclosedLines (start stop: String) (lines: List String) :
+  List String :=
+  (lines.splitOnP (fun s => (s.splitOn start).length > 1))[1]!.takeWhile (fun s => (s.splitOn stop).length ≤  1)
+
+def funTailBlock (path: System.FilePath) : IO (List String) := do
+  let lines ← IO.FS.lines path
+  let blocks := enclosedLines "<funtail>" "</funtail>" lines.toList
+  return blocks
+
+#eval enclosedLines "<funtail>" "</funtail>" ["import", "-- <funtail>", "a", "b", "-- </funtail>", "c", "-- <funtail>", "d", "-- </funtail>", "e"]
