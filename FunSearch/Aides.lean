@@ -86,9 +86,9 @@ def enclosedLines (start stop: String) (lines: List String) :
   List String :=
   (lines.splitOnP (fun s => (s.splitOn start).length > 1))[1]!.takeWhile (fun s => (s.splitOn stop).length ≤  1)
 
-def funTailBlock (path: System.FilePath) : IO (List String) := do
+def funTailBlock (path: System.FilePath) : IO (String) := do
   let lines ← IO.FS.lines path
   let blocks := enclosedLines "<funtail>" "</funtail>" lines.toList
-  return blocks
+  return blocks.foldl (fun s1 s2 => s1 ++ "\n" ++ s2) ""
 
 #eval enclosedLines "<funtail>" "</funtail>" ["import", "-- <funtail>", "a", "b", "-- </funtail>", "c", "-- <funtail>", "d", "-- </funtail>", "e"]
