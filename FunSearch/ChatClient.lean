@@ -10,50 +10,55 @@ structure ChatParams where
   n : Nat := 1
   temp : JsonNumber := 0.8
   stopTokens : Array String :=  #[]
-  model : String := "gpt-3.5-turbo"
   max_tokens : Nat := 1600
 
 
 inductive ChatServer where
-  | openAI
-  | azure (deployment: String := "leanaide-gpt4-32")
-  | generic (url: String) (hasSystemMessage : Bool := true)
+  | openAI (model: String := "gpt-3.5-turbo")
+  | azure (deployment: String := "leanaide-gpt4")
+      (model: String := "GPT-4")
+  | generic (model: String) (url: String) (hasSystemMessage : Bool)
 
 namespace ChatServer
 
 def url : ChatServer → IO String
-  | openAI =>
+  | openAI _ =>
       return "https://api.openai.com/v1/chat/completions"
-  | azure deployment =>
+  | azure deployment _ =>
       azureURL deployment
-  | generic url _ =>
+  | generic _ url _ =>
       return url++"/v1/chat/completions"
 
+def model : ChatServer → String
+  | openAI model => model
+  | azure _ model => model
+  | generic model _ _ => model
+
 def hasSystemMessage : ChatServer → Bool
-  | openAI => true
-  | azure _ => true
-  | generic _ b => b
+  | openAI _ => true
+  | azure _ _ => false
+  | generic _ _ b => b
 
 def authHeader? : ChatServer → IO (Option String)
-  | openAI => do
+  | openAI _ => do
     let key? ← openAIKey
     let key :=
     match key? with
       | some k => k
       | none => panic! "OPENAI_API_KEY not set"
     return some <|"Authorization: Bearer " ++ key
-  | azure _ => do
+  | azure .. => do
     let key? ← azureKey
     let key :=
     match key? with
       | some k => k
       | none => panic! "AZURE_OPENAI_KEY not set"
     return some <| "api-key: " ++ key
-  | generic _ _ =>
+  | generic .. =>
     return none
 
 def query (server: ChatServer)(messages : Json)(params : ChatParams) : CoreM Json := do
-  let dataJs := Json.mkObj [("model", params.model), ("messages", messages)
+  let dataJs := Json.mkObj [("model", server.model), ("messages", messages)
   , ("temperature", Json.num params.temp), ("n", params.n), ("max_tokens", params.max_tokens),
   ("stop", Json.arr <| params.stopTokens |>.map Json.str)
   ]
@@ -61,6 +66,8 @@ def query (server: ChatServer)(messages : Json)(params : ChatParams) : CoreM Jso
   trace[Translate.info] "Model query: {data}"
   let url ← server.url
   let authHeader? ← server.authHeader?
+  -- IO.eprintln s!"Querying {url} at {← IO.monoMsNow }"
+  -- let start ← IO.monoMsNow
   let baseArgs :=
     #[url, "-X", "POST", "-H", "Content-Type: application/json"]
   let args := match authHeader? with
@@ -72,23 +79,16 @@ def query (server: ChatServer)(messages : Json)(params : ChatParams) : CoreM Jso
     ("url", Json.str url),
     ("arguments", Json.arr <| baseArgs.map (Json.str)),
     ("data", data)]
+  -- IO.eprintln s!"Received response from {url} at {← IO.monoMsNow }; time taken: {(← IO.monoMsNow) - start}"
   match Lean.Json.parse output with
-  | Except.ok js =>
+  | Except.ok j =>
     appendLog "chat_queries"
-      (Json.mkObj [("query", queryJs), ("success", true), ("response", js)])
-    let outJson? :=
-        (js.getObjVal? "choices")
-    match outJson? with
-    | Except.ok outJson =>
-      pure outJson
-    | Except.error e =>
-      appendLog "chat_queries"
-        (Json.mkObj [("query", queryJs), ("success", false), ("error", e), ("response", output)])
-      throwError m!"No choices in JSON: {js.compress}"
+      (Json.mkObj [("query", queryJs), ("success", true), ("response", j)])
+    return j
   | Except.error e =>
     appendLog "chat_queries"
       (Json.mkObj [("query", queryJs), ("success", false), ("error", e), ("response", output)])
-    throwError m!"Error parsing JSON: {e}; source: {output}"
+    panic! s!"Error parsing JSON: {e}; source: {output}"
 
 def stringsFromJson (json: Json) : CoreM (Array String) := do
   let outArr : Array String ←

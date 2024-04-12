@@ -67,6 +67,8 @@ def fn (n: Nat) := match n with
     | 0 => 1
     | n + 1 => n * fn n
 
+#print fn
+
 #eval declDefn ``fn
 
 def fn' (n: Nat) := n + 1
