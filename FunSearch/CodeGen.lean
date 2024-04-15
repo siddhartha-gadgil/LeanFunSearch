@@ -80,9 +80,9 @@ def tailCode (lo hi n : Nat)(funcName eqnName: Name)
     let eqn ← `($eqnId $funcId)
     let m := mkIdent absFn
     let lossStx ←
-        `(command| def $lossFn := $sampleLossFn $eqn $m $sample)
+        `(command| def $lossFn := $sampleLossFn $eqn $funcId $m $sample)
     let lossDetailsStx ←
-        `(command| def $lossDetailsFn := $sampleLossDetailsFn $eqn $m $sample)
+        `(command| def $lossDetailsFn := $sampleLossDetailsFn $eqn $funcId $m $sample)
     let fmt := Format.joinSep
         [← sampleFmt, ← ppCommand lossStx, ← ppCommand lossDetailsStx] (Format.line ++ Format.line)
     return fmt
