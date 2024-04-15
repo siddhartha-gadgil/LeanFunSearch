@@ -42,7 +42,8 @@ def simpleInstructions (code: FunCode) : List String :=
     "```"
   ]
 
-def get? (code: String)(funName: Name) :
+def get? (code: String)(funName lossFunction: Name)
+  (lossDetails? : Option Name) :
   TermElabM <| Except String FunCode := do
   let code := leanBlock code.trim
   let values? ← runDefsViewM? code [funName, `loss, `matchData]
@@ -50,8 +51,8 @@ def get? (code: String)(funName: Name) :
   | Except.error e => return Except.error e
   | Except.ok values =>
     let funName ← getConstInfo funName
-    let loss? := values.find? `loss
-    let matchData? := values.find? `matchData
+    let loss? := values.find? lossFunction
+    let matchData? := lossDetails?.bind values.find?
     let matchData? := match matchData? with
     | none => none
     | some matchData =>
@@ -72,11 +73,13 @@ def get? (code: String)(funName: Name) :
     }
       return Except.ok funCode
 
-def getAll (codes: Array String)(tailCode: String)(funName: Name) :
+def getAll (codes: Array String)(tailCode: String)
+  (funName lossFunction : Name)(lossDetails? : Option Name) :
   TermElabM <| (Array FunCode) := do
   let mut funCodes := #[]
   for code in codes do
-    let funCode? ← get? (code ++ tailCode) funName
+    let funCode? ←
+      get? (code ++ tailCode) funName lossFunction lossDetails?
     match funCode? with
     | Except.error e =>
       appendLog "elab_errors" <|

@@ -3,13 +3,13 @@ import FunSearch.Sample
 import FunSearch.CodeGen
 import FunSearch.Frontend
 import FunSearch.FunCode
+import FunSearch.Helpers
 open Lean Meta Elab Term
 
 namespace funsearch
 
-structure EvolveParams where
+structure EvolveParams extends CodeParams where
   objective: String
-  funName : Name
   tailCode : String
   server : ChatServer := ChatServer.azure
   params : ChatParams := {}
@@ -24,7 +24,8 @@ def evolveStep (ev: EvolveParams)(popln : List FunCode) :
     FunCode.messages ev.server ev.objective ev.funName sample.toArray
   let response ← ev.server.query messages ev.params
   let outputs ←  ChatServer.stringsFromJson response
-  let newCodes ← FunCode.getAll outputs ev.tailCode ev.funName
+  let newCodes ←
+    FunCode.getAll outputs ev.tailCode ev.funName ev.lossFunction ev.lossDetails?
   return newCodes.toList ++ popln |>.eraseDups
 
 
@@ -45,11 +46,15 @@ def evolution (ev: EvolveParams)(popln : List FunCode)
     IO.println s!"steps remaining: {steps}"
     evolution ev popln n acceptableLoss
 
-def runEvolution (objective: String)(funName : Name)(file: System.FilePath)(steps: Nat := 100)
+def runEvolution (objective: String)(funName : Name)
+  (lossFunction: Name := `loss)
+  (lossDetails? : Option Name := none)
+  (file: System.FilePath)(steps: Nat := 100)
   (acceptableLoss : Float := 0.0) : TermElabM (List FunCode) := do
   let codes ← funBlocks file
   let tail ← funTailBlock file
-  let popln ← FunCode.getAll codes.toArray tail funName
+  let popln ←
+      FunCode.getAll codes.toArray tail funName lossFunction lossDetails?
   let ev : EvolveParams :=
-    {objective := objective, funName := funName, tailCode := tail}
+    {objective := objective, funName := funName, tailCode := tail, lossFunction := lossFunction, lossDetails? := lossDetails?}
   evolution ev popln.toList steps acceptableLoss
