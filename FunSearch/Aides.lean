@@ -76,11 +76,14 @@ def enclosedLineBlocks (start stop: String) (lines : List String):
 /-- Extracts blocks to be used as sample code from a file. These should be enclosed in `<funsearch>` and `</funsearch>` tags. Generally these will
 be in comments, e.g. `-- <funsearch>`. The lines containing the tags are not included in the output.
 -/
-def funBlocks (path: System.FilePath) : IO (List String) := do
+def funBlocks (path: System.FilePath)(cl?: Option String := none) : IO (List String) := do
   let lines ← IO.FS.lines path
-  let blocks := enclosedLineBlocks "<funsearch>" "</funsearch>" lines.toList
+  let start := match cl? with
+              | none => "<funsearch"
+              | some cl => "<funsearch " ++ cl ++ ">"
+  let blocks := enclosedLineBlocks start "</funsearch>" lines.toList
   return blocks.map
-    (fun ss => ss.foldl (fun s1 s2 => s1 ++ "\n" ++ s2) "")
+    (fun ss => ss.foldr (fun s1 s2 => s1 ++ "\n" ++ s2) "")
 
 def enclosedLines (start stop: String) (lines: List String) :
   List String :=
@@ -92,3 +95,5 @@ def funTailBlock (path: System.FilePath) : IO (String) := do
   return blocks.foldl (fun s1 s2 => s1 ++ "\n" ++ s2) ""
 
 #eval enclosedLines "<funtail>" "</funtail>" ["import", "-- <funtail>", "a", "b", "-- </funtail>", "c", "-- <funtail>", "d", "-- </funtail>", "e"]
+
+#eval funBlocks "FunSearch/Examples/SimpleNat.lean" "hard"
