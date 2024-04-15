@@ -120,7 +120,16 @@ def queryTextsForMessages (server: ChatServer)(messages : Json)
 
 def sysPrompt: String := "You are a Lean prover and Mathematics assistant. Give Lean code or Mathematical answers. Be precise and concise and give ONLY the code or mathematics asked for."
 
-def messages (server: ChatServer) (instructions: String)  : CoreM Json := do
+def sysResponse: String := "Sure. I will give precise and concise responses following the instructions."
+
+def sysMessage (server: ChatServer) : Array Json :=
+  if server.hasSystemMessage then
+     #[Json.mkObj [("role", "system"), ("content", sysPrompt)]]
+  else
+    #[Json.mkObj [("role", "user"), ("content", sysPrompt)],
+      Json.mkObj [("role", "assistant"), ("content", sysResponse)]]
+
+def simpleMessages (server: ChatServer) (instructions: String)  : CoreM Json := do
   let main := Json.mkObj [("role", "user"), ("content", instructions)]
   if server.hasSystemMessage then
     let system := Json.mkObj [("role", "system"), ("content", sysPrompt)]
@@ -130,7 +139,7 @@ def messages (server: ChatServer) (instructions: String)  : CoreM Json := do
 
 def queryTexts (server: ChatServer) (instructions: String)
     (params : ChatParams) : CoreM (Array String) := do
-  let messages ← server.messages instructions
+  let messages ← server.simpleMessages instructions
   queryTextsForMessages server messages params
 
 end ChatServer

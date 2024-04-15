@@ -12,14 +12,21 @@ structure FunCode where
   matchData? : Option Json
   deriving BEq
 
-#synth BEq FunCode
-
 def formatLines (lines: List String) : String :=
   lines.foldl (fun acc x => acc ++ "\n" ++ x) ""
 
 namespace FunCode
 
-def instructions (code: FunCode) : List String :=
+def goal (funName: Name)(objective: String) : String :=
+  s!"Give a function {funName} in Lean 4 so that: {objective}.\n\nThe extent to which the function satisfies this objective will be measured by a loss function, which you must minimize.\n\nGive ONLY the code in Lean."
+
+def report (funCode: FunCode) (objective: String) : String :=
+  let loss := s!"The code you gave was to minimize the loss of the function {funCode.funName}, which measured how well the function satisfied:\n {objective}. \n\n## Loss: For the code you gave, the **loss** was {funCode.loss}."
+  let details := funCode.matchData?.map (fun matchData =>
+    s!"\n\n## Match Data: More details on the terms of the loss for the function {funCode.funName} are as follows. \n\n{matchData.compress}") |>.getD ""
+  loss ++ details ++ "\n---\n"
+
+def simpleInstructions (code: FunCode) : List String :=
   let matchLines : List String :=
   match code.matchData? with
     | some (data : Json) =>
@@ -45,6 +52,10 @@ def get? (code: String)(funName: Name) :
     let funName ← getConstInfo funName
     let loss? := values.find? `loss
     let matchData? := values.find? `matchData
+    let matchData? := match matchData? with
+    | none => none
+    | some matchData =>
+      Json.parse matchData |>.toOption
     match loss? with
     | none => return Except.error "Expected loss to be defined"
     | some lossString =>
@@ -74,11 +85,28 @@ def getAll (codes: Array String)(tailCode: String)(funName: Name) :
     | Except.ok funCode => funCodes := funCodes.push funCode
   return funCodes
 
-def codeInstructions (funName: Name)
+def messages (server: ChatServer)(objective: String)
+  (funName: Name)(funCodes: Array FunCode) : Json :=
+  let goalMessage := goal funName objective
+  let (msgs, report?) := funCodes.foldl (fun (acc, report?) funCode =>
+    let prevReport :=
+      report?.getD ""
+    let acc := acc ++
+      #[Json.mkObj [("user", prevReport ++ goalMessage), ("assistant", funCode.code)]]
+    (acc, some <| report funCode objective))
+    (server.sysMessage, none)
+  let prevReport :=
+      report?.getD ""
+  let messages := msgs ++
+    #[Json.mkObj [("user", prevReport ++ goalMessage)]]
+  Json.arr messages
+
+
+def simpleCodeInstructions (funName: Name)
   (codeSamples: List FunCode)(matchData: Bool := false)
   (properties: List String := []) : String :=
   let sampleInstructions :=
-    codeSamples.bind (fun code => code.instructions)
+    codeSamples.bind (fun code => code.simpleInstructions)
   let head :=
     s!"Generate code in Lean 4 for the function {funName}\
       to minimize the associated **loss**. \
@@ -92,5 +120,9 @@ def codeInstructions (funName: Name)
        that depend on the function {funName}."
     else head
   formatLines (head :: properties ++ sampleInstructions)
+
+/-
+TODO: Have a collection of messages instead of a single message.
+-/
 
 end FunCode

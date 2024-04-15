@@ -8,6 +8,7 @@ open Lean Meta Elab Term
 namespace funsearch
 
 structure EvolveParams where
+  objective: String
   funName : Name
   tailCode : String
   server : ChatServer := ChatServer.azure
@@ -15,15 +16,14 @@ structure EvolveParams where
   n : Nat := 3
   t : Float := 0.8
   matchData : Bool := false
-  properties : List String := []
-
 
 def evolveStep (ev: EvolveParams)(popln : List FunCode) :
     TermElabM (List FunCode) := do
   let sample ← pickByLoss popln (fun code ↦ code.loss) ev.n ev.t
-  let instructions :=
-    FunCode.codeInstructions ev.funName sample ev.matchData ev.properties
-  let outputs ← ev.server.queryTexts instructions ev.params
+  let messages :=
+    FunCode.messages ev.server ev.objective ev.funName sample.toArray
+  let response ← ev.server.query messages ev.params
+  let outputs ←  ChatServer.stringsFromJson response
   let newCodes ← FunCode.getAll outputs ev.tailCode ev.funName
   return newCodes.toList ++ popln |>.eraseDups
 
@@ -45,10 +45,11 @@ def evolution (ev: EvolveParams)(popln : List FunCode)
     IO.println s!"steps remaining: {steps}"
     evolution ev popln n acceptableLoss
 
-def runEvolution (funName : Name)(file: System.FilePath)(steps: Nat := 100)
+def runEvolution (objective: String)(funName : Name)(file: System.FilePath)(steps: Nat := 100)
   (acceptableLoss : Float := 0.0) : TermElabM (List FunCode) := do
   let codes ← funBlocks file
   let tail ← funTailBlock file
   let popln ← FunCode.getAll codes.toArray tail funName
-  let ev : EvolveParams := {funName := funName, tailCode := tail}
+  let ev : EvolveParams :=
+    {objective := objective, funName := funName, tailCode := tail}
   evolution ev popln.toList steps acceptableLoss
