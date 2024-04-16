@@ -63,7 +63,7 @@ def response : TermElabM Json := do
   let msgs :=
     FunCode.messages server
       "`fn: Nat → Nat` satsfies $f(n+ 1)^2 = f(n)^2 + 4n + 8$" `fn (← startCode)
-  let response ← server.query msgs {n := 3, temp := 1.5}
+  let response ← server.query msgs {n := 3}
   return response
 
 -- #eval response

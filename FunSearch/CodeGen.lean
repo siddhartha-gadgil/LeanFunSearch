@@ -19,7 +19,8 @@ namespace funsearch
 
 Sampling natural numbers. To sample other types, we can map from natural numbers.
 -/
-def sampleNats (lo hi n: Nat)(sampleFn: Name) : MetaM (Format × (List Nat)) := do
+def sampleNatStx (lo hi n: Nat)(sampleFn: Name) :
+    MetaM ((TSyntax `command) × (Syntax.Term) × (List Nat)) := do
   let sample ←  List.replicate n 0 |>.mapM fun _ =>
     IO.rand lo hi
   let s := sample.toString
@@ -31,13 +32,41 @@ def sampleNats (lo hi n: Nat)(sampleFn: Name) : MetaM (Format × (List Nat)) := 
     let nat := mkIdent `Nat
     let sampleId := mkIdent sampleFn
     let result ← `(command|def $sampleId : $lst $nat := $stx)
-    return (← ppCommand result, sample)
+    return (result, stx, sample)
   | Except.error err =>
     throwError m!"{err}"
 
+
+def sampleNats (lo hi n: Nat)(sampleFn: Name) : MetaM (Format × (List Nat)) := do
+    let (stx, _, sample) ← sampleNatStx lo hi n sampleFn
+    return (← ppCommand stx, sample)
+
 #eval (sampleNats 0 100 10 `sample)
 
-def sampleα [ToString α] (lo hi n: Nat)(sampleFn: Name)(m : Nat → α) : MetaM (Format) := do
+def sampleα (lo hi n: Nat)(sampleFn fromNat: Name) :
+        MetaM (Format × (List Syntax.Term)) := do
+    let (_, rhs, sampleNat) ← sampleNatStx lo hi n sampleFn
+    let fromNatId := mkIdent fromNat
+    let sample ← sampleNat.mapM fun n => do
+        let n := Syntax.mkNumLit (toString n)
+        `($fromNatId $n)
+    let sampleId := mkIdent sampleFn
+    let lmId := mkIdent ``List.map
+    let cmd ← `(command|def $sampleId  := $lmId $fromNatId $rhs)
+    return (← ppCommand cmd, sample)
+
+/--
+## Tail code for Nat → Nat functions: Broken version
+
+We have the function name, equation name and the sampling parameters as arguments.
+
+We will use the default names `loss` and `lossDetails` for the loss and the details. These will use functions from the helper.
+
+The equation is expected to take a single argument, the function. So the equation is `eqnName funcName`.
+
+We can generalize this to functions `α → β` by using the `sampleα` function for the `sampleFmt` argument and an appropriate absolute value function for `absFn`.
+-/
+def sampleα' [ToString α] (lo hi n: Nat)(sampleFn: Name)(m : Nat → α) : MetaM (Format) := do
   let sample ←  List.replicate n 0 |>.mapM fun _ => do
     pure <| m (← IO.rand lo hi)
   let s := sample.toString
@@ -53,20 +82,11 @@ def sampleα [ToString α] (lo hi n: Nat)(sampleFn: Name)(m : Nat → α) : Meta
   | Except.error err =>
     throwError m!"{err}"
 
-#eval (sampleα  0 100 10 `sample Nat.toFloat)
+#eval (sampleα'  0 100 10 `sample Nat.toFloat)
 
-/--
-## Tail code for Nat → Nat functions: Broken version
 
-We have the function name, equation name and the sampling parameters as arguments.
 
-We will use the default names `loss` and `lossDetails` for the loss and the details. These will use functions from the helper.
-
-The equation is expected to take a single argument, the function. So the equation is `eqnName funcName`.
-
-We can generalize this to functions `α → β` by using the `sampleα` function for the `sampleFmt` argument and an appropriate absolute value function for `absFn`.
--/
-def tailCodeFmt (lo hi n : Nat)(funcName eqnName: Name)
+def tailCodeFmt' (lo hi n : Nat)(funcName eqnName: Name)
     (sampleFmt : MetaM (Format × List Nat) := sampleNats lo hi n `sample)
     (absFn : Name := ``natAbs):
     MetaM Format := do
@@ -87,11 +107,11 @@ def tailCodeFmt (lo hi n : Nat)(funcName eqnName: Name)
         [(← sampleFmt).1, ← ppCommand lossStx, ← ppCommand lossDetailsStx] (Format.line ++ Format.line)
     return fmt
 
-def tailCode (lo hi n : Nat)(funcName eqnName: Name)
+def tailCode'(lo hi n : Nat)(funcName eqnName: Name)
     (sampleFmt : MetaM (Format × List Nat) := sampleNats lo hi n `sample)
     (absFn : Name := ``natAbs):
     MetaM String := do
-    let fmt ← tailCodeFmt lo hi n funcName eqnName sampleFmt absFn
+    let fmt ← tailCodeFmt' lo hi n funcName eqnName sampleFmt absFn
     return fmt.pretty
 
 /--
@@ -139,13 +159,48 @@ def tailCodeNat (lo hi n : Nat)(funcName eqnName: Name)
     let (fmt, pairs) ← tailCodeNatFmt lo hi n funcName eqnName sampleFmt
     return (fmt.pretty, pairs)
 
-#check Syntax.toNat
-#eval tailCode 1 100 7 `fn `fnEqn
-
 #eval tailCodeNat 1 100 7 `fn `fnEqn
 
-#eval (Float.abs ∘ Nat.toFloat) 3
+def tailCodeFmt (lo hi n : Nat)(funcName eqnName fromNatName: Name)
+    (sampleFmt : MetaM (Format × List Syntax.Term) :=
+        sampleα  lo hi n `sample fromNatName):
+    MetaM (Format × List (Name × Syntax.Term)) := do
+    let sampleId := mkIdent `sample
+    let lossFn := mkIdent `loss
+    let eqnId := mkIdent eqnName
+    let funcId := mkIdent funcName
+    let sampleLossFn := mkIdent ``sampleLossNat
+    let eqn ← `($eqnId $funcId)
+    let nat := mkIdent `Nat
+    let lossStx ←
+        `(command| def $lossFn : $nat := $sampleLossFn $eqn $sampleId)
+    let lossFmt ← ppCommand lossStx
+    let mut commands := #[(← sampleFmt).1, lossFmt]
+    let mut namePairs : Array (Name × Syntax.Term) := #[]
+    let mut i := 0
+    for jval in (← sampleFmt).2 do
+        let name := s!"lossDataPoint_{i}".toName
+        let nameId := mkIdent name
+        namePairs := namePairs.push (name, jval)
+        let cmd ← `(command| def $nameId : $nat := $eqn $jval)
+        commands := commands.push (← ppCommand cmd)
+        i := i + 1
+    let fmt := Format.joinSep
+        commands.toList (Format.line ++ Format.line)
+    return (fmt, namePairs.toList)
 
+def tailCode (lo hi n : Nat)(funcName eqnName fromNatName: Name)
+    (sampleFmt : MetaM (Format × List Syntax.Term) :=
+        sampleα  lo hi n `sample fromNatName):
+    MetaM (String × List (Name × Syntax.Term)) := do
+    let (fmt, pairs) ← tailCodeFmt lo hi n funcName eqnName fromNatName sampleFmt
+    return (fmt.pretty, pairs)
+
+#eval tailCode 1 100 7 `fn `fnEqn ``Int.toNat
+
+/-!
+Other code generation. Currently not used.
+-/
 partial def arrowHeads (type: Syntax.Term)
     (accum: Array <| TSyntax ``bracketedBinder := #[]) :
         CoreM <| (Array <| TSyntax ``bracketedBinder) × Syntax.Term := do
