@@ -52,10 +52,10 @@ def runDefsExprM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM 
       | some seek => match seek.value? with
         | none => return none
         | some val =>
-          logInfo m!"Found definition {n}, {← ppExpr val}, {← ppExpr (← reduce val)}"
+          -- logInfo m!"Found definition {n}, {← ppExpr val}, {← ppExpr (← reduce val)}"
           let val ← reduce val
           let s ← ppTerm {env := ← getEnv} (← PrettyPrinter.delab val)
-          logInfo m!"Reduced by ppTerm to {s}"
+          -- logInfo m!"Reduced by ppTerm to {s}"
           let (r,_) ← simp val (← Simp.Context.mkDefault)
           return some (n, r.expr)
   if !modifyEnv then setEnv prevEnv
@@ -78,9 +78,9 @@ def runDefsViewM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM 
 
 def runDefsViewM? (s: String)(names: List Name)(modifyEnv: Bool := false):
   MetaM <| Except String (HashMap Name String) := do
-  logInfo m!"Running defs view for {names} in {s}"
+  -- logInfo m!"Running defs view for {names} in {s}"
   let (vals, logs) ← runDefsViewM s names modifyEnv
-  logInfo m!"Defs view result: {vals.toList}"
+  -- logInfo m!"Defs view result: {vals.toList}"
   let mut hasErrors : Bool := false
   let mut l := []
   for msg in logs.toList do

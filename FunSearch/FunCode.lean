@@ -6,7 +6,7 @@ open Lean Elab Term
 namespace funsearch
 
 instance : Repr Json where
-  reprPrec json _ := json.pretty 2
+  reprPrec json _ := json.compress
 
 structure FunCode where
   funName: Name
@@ -96,49 +96,55 @@ def getAll (codes: Array String)(tailCode: String)
     | Except.ok funCode => funCodes := funCodes.push funCode
   return funCodes
 
-def getNat? (code: String)(funName lossFunction: Name) :
+def getNat? (code: String)(tailCode: String × List (Name × Nat))(funName lossFunction: Name) :
   TermElabM <| Except String FunCode := do
-  let code := leanBlock code.trim ++ "\n"
-  logInfo code
-  let (values, _) ← runDefsNatM code [`loss]
-  logInfo "Ran frontend"
-  logInfo m!"{values.toList}"
+  let fullCode := leanBlock code.trim ++ "\n\n" ++ tailCode.1
+  let pairs := tailCode.2
+  let names := pairs.map (·.1)
+  -- logInfo fullCode
+  -- logInfo m!"{names}"
+  let (values, _) ← runDefsNatM fullCode (`loss :: names)
     let loss? := values.find? lossFunction
     match loss? with
     | none => return Except.error "Expected loss to be defined"
     | some lossNat =>
+      let pointErrors := pairs.filterMap <| fun (name, nat) =>
+        let value? := values.find? name
+        value?.map (fun value =>
+          Json.mkObj [("point", nat), ("error", value)])
       let funCode : FunCode :=
       {
         funName := funName,
         code := code,
         loss := lossNat.toFloat,
-        matchData? := none
+        matchData? := some <| Json.arr pointErrors.toArray
       }
-      logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"
+      -- logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"
       return Except.ok funCode
 
-def getAllNat (codes: Array String)(tailCode: String)
+def getAllNat (codes: Array String)(tailCode: String × List (Name × Nat))
   (funName lossFunction : Name) :
   TermElabM <| (Array FunCode) := do
   let mut funCodes := #[]
   for code in codes do
     let funCode? ←
-      getNat? (code ++ "\n\n" ++ tailCode) funName lossFunction
+      getNat? code tailCode funName lossFunction
     match funCode? with
     | Except.error e =>
       appendLog "elab_errors" <|
-        Json.mkObj [("error", e), ("code", code), ("funName", funName.toString), ("tailCode", tailCode)]
-      logError <| "e" ++ "\nin" ++ code ++ "\n\n" ++ tailCode
+        Json.mkObj [("error", e), ("code", code), ("funName", funName.toString), ("tailCode", tailCode.1)]
+      logError <| "e" ++ "\nin" ++ code ++ "\n\n" ++ tailCode.1
       pure ()
     | Except.ok funCode => funCodes := funCodes.push funCode
   return funCodes
 
 
-def getAllIO (codes: IO (List String)) (tailCode: MetaM String)
-  (funName : Name) (lossFunction : Name := `loss) :
-  TermElabM (Array FunCode) := do
+def getAllIO (codes: IO (List String))
+    (tailCode: MetaM (String × List (Name × Nat)))
+    (funName : Name) (lossFunction : Name := `loss) :
+    TermElabM (Array FunCode) := do
   let codes ← codes
-  logInfo <| "Codes: " ++ codes.toString
+  -- logInfo <| "Codes: " ++ codes.toString
   getAllNat codes.toArray (← tailCode) funName lossFunction
 
 def messages (server: ChatServer)(objective: String)

@@ -47,7 +47,7 @@ def tail := tailCodeNat 1 100 7 `fn ``fnEqnNat
 
 #check FunCode.getAllIO codeHeads tail `fn
 
-
+#check Lean.Name.num
 #eval FunCode.getAllIO codeHeads tail `fn
 
 
