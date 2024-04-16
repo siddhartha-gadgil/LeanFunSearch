@@ -20,8 +20,8 @@ def formatLines (lines: List String) : String :=
 
 namespace FunCode
 
-def goal (funName: Name)(objective: String) : String :=
-  s!"Give a function `{funName}` in Lean 4 so that: {objective}.\n\nThe extent to which the function satisfies this objective will be measured by a **loss** function, which you must minimize.\n\nGive ONLY the code in Lean."
+def goal (objective: String) : String :=
+  s!"{objective}.\n\nThe extent to which the objective is satisfied will be measured by a **loss** function, which you must minimize.\n\nGive ONLY the code in Lean."
 
 def report (funCode: FunCode) (objective: String) : String :=
   let loss := s!"The code you gave was to minimize the loss of the function {funCode.funName}, which measured how well the function satisfied:\n {objective}. \n\n## Loss: For the code you gave, the **loss** was {funCode.loss}."
@@ -47,7 +47,7 @@ def simpleInstructions (code: FunCode) : List String :=
 
 def get? (code: String)(funName lossFunction: Name)
   (lossDetails? : Option Name) :
-  TermElabM <| Except String FunCode := do
+  MetaM <| Except String FunCode := do
   let code := leanBlock code.trim ++ "\n"
   logInfo code
   let values? ← runDefsViewM? code [`loss, `matchData]
@@ -82,7 +82,7 @@ def get? (code: String)(funName lossFunction: Name)
 
 def getAll (codes: Array String)(tailCode: String)
   (funName lossFunction : Name)(lossDetails? : Option Name) :
-  TermElabM <| (Array FunCode) := do
+  MetaM <| (Array FunCode) := do
   let mut funCodes := #[]
   for code in codes do
     let funCode? ←
@@ -97,7 +97,7 @@ def getAll (codes: Array String)(tailCode: String)
   return funCodes
 
 def getNat? (code: String)(tailCode: String × List (Name × Nat))(funName lossFunction: Name) :
-  TermElabM <| Except String FunCode := do
+  MetaM <| Except String FunCode := do
   let fullCode := leanBlock code.trim ++ "\n\n" ++ tailCode.1
   let pairs := tailCode.2
   let names := pairs.map (·.1)
@@ -130,7 +130,7 @@ def getNat? (code: String)(tailCode: String × List (Name × Nat))(funName lossF
 
 def getAllNat (codes: Array String)(tailCode: String × List (Name × Nat))
   (funName lossFunction : Name) :
-  TermElabM <| (Array FunCode) := do
+  MetaM <| (Array FunCode) := do
   let mut funCodes := #[]
   for code in codes do
     let funCode? ←
@@ -148,14 +148,14 @@ def getAllNat (codes: Array String)(tailCode: String × List (Name × Nat))
 def getAllIO (codes: IO (List String))
     (tailCode: MetaM (String × List (Name × Nat)))
     (funName : Name) (lossFunction : Name := `loss) :
-    TermElabM (Array FunCode) := do
+    MetaM (Array FunCode) := do
   let codes ← codes
   -- logInfo <| "Codes: " ++ codes.toString
   getAllNat codes.toArray (← tailCode) funName lossFunction
 
 def messages (server: ChatServer)(objective: String)
-  (funName: Name)(funCodes: Array FunCode) : Json :=
-  let goalMessage := goal funName objective
+  (funCodes: Array FunCode) : Json :=
+  let goalMessage := goal objective
   let (msgs, report?) := funCodes.foldl (fun (acc, report?) funCode =>
     let prevReport :=
       report?.getD ""

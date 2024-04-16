@@ -18,7 +18,7 @@ structure EvolveParams extends CodeParams where
   matchData : Bool := false
 
 def evolveStep (ev: EvolveParams)(popln : List FunCode) :
-    TermElabM (List FunCode) := do
+    MetaM (List FunCode) := do
   let sample ← pickByLoss popln (fun code ↦ code.loss) ev.n ev.t
   let messages :=
     FunCode.messages ev.server ev.objective ev.funName sample.toArray
@@ -31,7 +31,7 @@ def evolveStep (ev: EvolveParams)(popln : List FunCode) :
 
 def evolution (ev: EvolveParams)(popln : List FunCode)
   (steps: Nat)(acceptableLoss : Float := 0.0) :
-  TermElabM (List FunCode) := do
+  MetaM (List FunCode) := do
   if popln.any fun code ↦ code.loss < acceptableLoss then
     return popln.filter fun code ↦ code.loss < acceptableLoss
   else
@@ -50,7 +50,7 @@ def runEvolution (objective: String)(funName : Name)
   (lossFunction: Name := `loss)
   (lossDetails? : Option Name := none)
   (file: System.FilePath)(steps: Nat := 100)
-  (acceptableLoss : Float := 0.0) : TermElabM (List FunCode) := do
+  (acceptableLoss : Float := 0.0) : MetaM (List FunCode) := do
   let codes ← funBlocks file
   let tail ← funTailBlock file
   let popln ←

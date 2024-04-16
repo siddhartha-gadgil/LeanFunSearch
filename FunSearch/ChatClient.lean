@@ -36,7 +36,7 @@ def model : ChatServer → String
 
 def hasSystemMessage : ChatServer → Bool
   | openAI _ => true
-  | azure _ _ => false
+  | azure _ _ => true
   | generic _ _ b => b
 
 def authHeader? : ChatServer → IO (Option String)

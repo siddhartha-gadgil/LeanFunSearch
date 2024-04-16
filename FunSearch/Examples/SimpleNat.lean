@@ -49,20 +49,20 @@ def startCode := FunCode.getAllIO codeHeads tail `fn
 #eval startCode
 
 open Lean Meta Elab
-def msgs : TermElabM Json := do
+def msgs : MetaM Json := do
   let server := ChatServer.azure
   let msgs :=
     FunCode.messages server
-      "`fn: Nat → Nat` satsfies $f(n+ 1)^2 = f(n)^2 + 4n + 8$" `fn (← startCode)
+      "Find a function `fn: Nat → Nat` that satisfies $f(n+ 1)^2 = f(n)^2 + 4n + 8$." (← startCode)
   return msgs
 
 #eval msgs
 
-def response : TermElabM Json := do
+def response : MetaM Json := do
   let server := ChatServer.azure
   let msgs :=
     FunCode.messages server
-      "`fn: Nat → Nat` satsfies $f(n+ 1)^2 = f(n)^2 + 4n + 8$" `fn (← startCode)
+      "`fn: Nat → Nat` satsfies $f(n+ 1)^2 = f(n)^2 + 4n + 8$" (← startCode)
   let response ← server.query msgs {n := 3}
   return response
 
