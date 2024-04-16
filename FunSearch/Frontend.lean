@@ -54,7 +54,6 @@ def runDefsExprM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM 
         | some val =>
           -- logInfo m!"Found definition {n}, {← ppExpr val}, {← ppExpr (← reduce val)}"
           let val ← reduce val
-          let s ← ppTerm {env := ← getEnv} (← PrettyPrinter.delab val)
           -- logInfo m!"Reduced by ppTerm to {s}"
           let (r,_) ← simp val (← Simp.Context.mkDefault)
           return some (n, r.expr)

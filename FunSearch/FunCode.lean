@@ -21,7 +21,7 @@ def formatLines (lines: List String) : String :=
 namespace FunCode
 
 def goal (funName: Name)(objective: String) : String :=
-  s!"Give a function {funName} in Lean 4 so that: {objective}.\n\nThe extent to which the function satisfies this objective will be measured by a loss function, which you must minimize.\n\nGive ONLY the code in Lean."
+  s!"Give a function `{funName}` in Lean 4 so that: {objective}.\n\nThe extent to which the function satisfies this objective will be measured by a **loss** function, which you must minimize.\n\nGive ONLY the code in Lean."
 
 def report (funCode: FunCode) (objective: String) : String :=
   let loss := s!"The code you gave was to minimize the loss of the function {funCode.funName}, which measured how well the function satisfied:\n {objective}. \n\n## Loss: For the code you gave, the **loss** was {funCode.loss}."
@@ -103,27 +103,30 @@ def getNat? (code: String)(tailCode: String × List (Name × Nat))(funName lossF
   let names := pairs.map (·.1)
   -- logInfo fullCode
   -- logInfo m!"{names}"
-  let (values, logs) ← runDefsNatM fullCode (`loss :: names)
-  for msg in logs.toList do
-    if msg.severity == MessageSeverity.error then
-      logWarning msg.data
-  let loss? := values.find? lossFunction
-  match loss? with
-  | none => return Except.error "Expected loss to be defined"
-  | some lossNat =>
-    let pointErrors := pairs.filterMap <| fun (name, nat) =>
-      let value? := values.find? name
-      value?.map (fun value =>
-        Json.mkObj [("point", nat), ("error", value)])
-    let funCode : FunCode :=
-    {
-      funName := funName,
-      code := code,
-      loss := lossNat.toFloat,
-      matchData? := some <| Json.arr pointErrors.toArray
-    }
-    -- logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"
-    return Except.ok funCode
+  try
+    let (values, logs) ← runDefsNatM fullCode (`loss :: names)
+    for msg in logs.toList do
+      if msg.severity == MessageSeverity.error then
+        logWarning msg.data
+    let loss? := values.find? lossFunction
+    match loss? with
+    | none => return Except.error "Expected loss to be defined"
+    | some lossNat =>
+      let pointErrors := pairs.filterMap <| fun (name, nat) =>
+        let value? := values.find? name
+        value?.map (fun value =>
+          Json.mkObj [("point", nat), ("error", value)])
+      let funCode : FunCode :=
+      {
+        funName := funName,
+        code := code,
+        loss := lossNat.toFloat,
+        matchData? := some <| Json.arr pointErrors.toArray
+      }
+      -- logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"
+      return Except.ok funCode
+  catch e => return Except.error (← e.toMessageData.toString)
+
 
 def getAllNat (codes: Array String)(tailCode: String × List (Name × Nat))
   (funName lossFunction : Name) :
@@ -157,13 +160,13 @@ def messages (server: ChatServer)(objective: String)
     let prevReport :=
       report?.getD ""
     let acc := acc ++
-      #[Json.mkObj [("user", prevReport ++ goalMessage), ("assistant", funCode.code)]]
+      #[Json.mkObj [("role", "user"), ("content", prevReport ++ goalMessage), ("role", "assistant"), ("content", funCode.code)]]
     (acc, some <| report funCode objective))
     (server.sysMessage, none)
   let prevReport :=
       report?.getD ""
   let messages := msgs ++
-    #[Json.mkObj [("user", prevReport ++ goalMessage)]]
+    #[Json.mkObj [("role", "user"), ("content", prevReport ++ goalMessage)]]
   Json.arr messages
 
 

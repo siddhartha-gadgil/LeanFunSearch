@@ -45,7 +45,27 @@ def tail := tailCodeNat 1 100 7 `fn ``fnEqnNat
 
 #eval tail
 
-#eval FunCode.getAllIO codeHeads tail `fn
+def startCode := FunCode.getAllIO codeHeads tail `fn
+#eval startCode
 
+open Lean Meta Elab
+def msgs : TermElabM Json := do
+  let server := ChatServer.azure
+  let msgs :=
+    FunCode.messages server
+      "`fn: Nat → Nat` satsfies $f(n+ 1)^2 = f(n)^2 + 4n + 8$" `fn (← startCode)
+  return msgs
+
+#eval msgs
+
+def response : TermElabM Json := do
+  let server := ChatServer.azure
+  let msgs :=
+    FunCode.messages server
+      "`fn: Nat → Nat` satsfies $f(n+ 1)^2 = f(n)^2 + 4n + 8$" `fn (← startCode)
+  let response ← server.query msgs {n := 3, temp := 1.5}
+  return response
+
+-- #eval response
 
 end funsearch
