@@ -12,7 +12,7 @@ structure EvolveParams extends CodeParams where
   objective: String
   tailCode : String
   server : ChatServer := ChatServer.azure
-  params : ChatParams := {}
+  params : ChatParams := {n := 3}
   n : Nat := 3
   t : Float := 0.8
   matchData : Bool := false
