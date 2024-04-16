@@ -94,7 +94,31 @@ def tailCode (lo hi n : Nat)(funcName eqnName: Name)
     let fmt ← tailCodeFmt lo hi n funcName eqnName sampleFmt absFn
     return fmt.pretty
 
+def tailCodeNatFmt (lo hi n : Nat)(funcName eqnName: Name)
+    (sampleFmt : MetaM Format := sampleNats lo hi n `sample):
+    MetaM Format := do
+    let sample := mkIdent `sample
+    let lossFn := mkIdent `loss
+    let eqnId := mkIdent eqnName
+    let funcId := mkIdent funcName
+    let sampleLossFn := mkIdent ``sampleLossNat
+    let eqn ← `($eqnId $funcId)
+    let nat := mkIdent `Nat
+    let lossStx ←
+        `(command| def $lossFn : $nat := $sampleLossFn $eqn $sample)
+    let fmt := Format.joinSep
+        [← sampleFmt, ← ppCommand lossStx] (Format.line ++ Format.line)
+    return fmt
+
+def tailCodeNat (lo hi n : Nat)(funcName eqnName: Name)
+    (sampleFmt : MetaM Format := sampleNats lo hi n `sample):
+    MetaM String := do
+    let fmt ← tailCodeNatFmt lo hi n funcName eqnName sampleFmt
+    return fmt.pretty
+
 #eval tailCode 1 100 7 `fn `fnEqn
+
+#eval tailCodeNat 1 100 7 `fn `fnEqn
 
 #eval (Float.abs ∘ Nat.toFloat) 3
 

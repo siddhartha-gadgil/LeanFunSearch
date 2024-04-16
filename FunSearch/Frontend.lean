@@ -54,8 +54,18 @@ def runDefsExprM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM 
         | some val =>
           logInfo m!"Found definition {n}, {← ppExpr val}, {← ppExpr (← reduce val)}"
           let val ← reduce val
+          let s ← ppTerm {env := ← getEnv} (← PrettyPrinter.delab val)
+          logInfo m!"Reduced by ppTerm to {s}"
           let (r,_) ← simp val (← Simp.Context.mkDefault)
           return some (n, r.expr)
+  if !modifyEnv then setEnv prevEnv
+  return (HashMap.ofList pairs, logs)
+
+def runDefsNatM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM (HashMap Name Nat × MessageLog) := do
+  let prevEnv ← getEnv
+  let (_, logs) ← runFrontendM s true
+  let pairs : List (Name × Nat) ←
+    names.mapM <| fun n => do pure (n, ← reduceNatNative n)
   if !modifyEnv then setEnv prevEnv
   return (HashMap.ofList pairs, logs)
 
@@ -93,3 +103,11 @@ def checkElabFrontM(s: String) : MetaM <| List String := do
       let x ← msg.data.toString
       l := l.append [x]
   return l
+
+def egNat := 3
+
+def egNatNative : MetaM Nat := do
+  let n ← reduceNatNative ``egNat
+  return n
+
+#eval egNatNative

@@ -31,12 +31,17 @@ namespace funsearch
 def fnEqn (f: Nat → Nat) : Nat → Float :=
   fun n ↦ (f (n + 1) * f (n + 1) - (f (n) * f (n)) - 4 * n - 4).toFloat
 
+def fnEqnNat (f: Nat → Nat) : Nat → Nat :=
+  fun n ↦ Int.natAbs
+    (f (n + 1) * f (n + 1) : Int) - ((f (n) * f (n)) - 4 * n - 8)
+
+
 def codeHeads : IO <| List String :=
   funBlocks "FunSearch/Examples/SimpleNat.lean"
 
 #eval codeHeads
 
-def tail := tailCode 1 100 7 `fn ``fnEqn
+def tail := tailCodeNat 1 100 7 `fn ``fnEqnNat
 
 #eval tail
 

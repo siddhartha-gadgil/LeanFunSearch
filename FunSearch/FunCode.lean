@@ -96,13 +96,50 @@ def getAll (codes: Array String)(tailCode: String)
     | Except.ok funCode => funCodes := funCodes.push funCode
   return funCodes
 
+def getNat? (code: String)(funName lossFunction: Name) :
+  TermElabM <| Except String FunCode := do
+  let code := leanBlock code.trim ++ "\n"
+  logInfo code
+  let (values, _) ← runDefsNatM code [`loss]
+  logInfo "Ran frontend"
+  logInfo m!"{values.toList}"
+    let loss? := values.find? lossFunction
+    match loss? with
+    | none => return Except.error "Expected loss to be defined"
+    | some lossNat =>
+      let funCode : FunCode :=
+      {
+        funName := funName,
+        code := code,
+        loss := lossNat.toFloat,
+        matchData? := none
+      }
+      logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"
+      return Except.ok funCode
+
+def getAllNat (codes: Array String)(tailCode: String)
+  (funName lossFunction : Name) :
+  TermElabM <| (Array FunCode) := do
+  let mut funCodes := #[]
+  for code in codes do
+    let funCode? ←
+      getNat? (code ++ "\n\n" ++ tailCode) funName lossFunction
+    match funCode? with
+    | Except.error e =>
+      appendLog "elab_errors" <|
+        Json.mkObj [("error", e), ("code", code), ("funName", funName.toString), ("tailCode", tailCode)]
+      logError <| "e" ++ "\nin" ++ code ++ "\n\n" ++ tailCode
+      pure ()
+    | Except.ok funCode => funCodes := funCodes.push funCode
+  return funCodes
+
+
 def getAllIO (codes: IO (List String)) (tailCode: MetaM String)
-  (funName : Name) (lossFunction : Name := `loss)
-  (lossDetails? : Option Name := some `lossDetails) :
+  (funName : Name) (lossFunction : Name := `loss) :
   TermElabM (Array FunCode) := do
   let codes ← codes
   logInfo <| "Codes: " ++ codes.toString
-  getAll codes.toArray (← tailCode) funName lossFunction lossDetails?
+  getAllNat codes.toArray (← tailCode) funName lossFunction
 
 def messages (server: ChatServer)(objective: String)
   (funName: Name)(funCodes: Array FunCode) : Json :=
