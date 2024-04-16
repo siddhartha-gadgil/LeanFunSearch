@@ -118,7 +118,7 @@ def queryTextsForMessages (server: ChatServer)(messages : Json)
   stringsFromJson response
 
 
-def sysPrompt: String := "You are a Lean prover and Mathematics assistant. Give Lean code or Mathematical answers. Be precise and concise and give ONLY the code or mathematics asked for."
+def sysPrompt: String := "You are a Lean prover and Mathematics assistant. Give Lean code or Mathematical answers. Be precise and concise and give ONLY the code or mathematics asked for. If you are giving Lean code, either give ONLY the code or enclose in fenced code blocks between ```lean and ```"
 
 def sysResponse: String := "Sure. I will give precise and concise responses following the instructions."
 
