@@ -11,14 +11,14 @@ variable {α : Type}{β : Type}
 /--
 Loss by averaging the error given by `eqn` over the sample, normalized by typically the absolute value.
 -/
-def sampleLoss (eqn: α → Float)(f : α → β)(m : β  → Float)(sample : Array α) : Float :=
-  let n := sample.size
+def sampleLoss (eqn: α → Float)(f : α → β)(m : β  → Float)(sample : List α) : String :=
+  let n := sample.length
   let sum := sample.foldl (init := 0.0)
     (fun acc x => acc + (eqn x / (1.0 + m (f x))))
-  sum / n.toFloat
+  (sum / n.toFloat).toString
 
 def sampleLossDetails [ToJson α](eqn: α → Float)(f : α → β)(m : β  → Float)
-  (sample : Array α) : Json :=
+  (sample : List α) : Json :=
   let obs := (
     sample.map (fun x =>
       let error := eqn x
@@ -29,7 +29,7 @@ def sampleLossDetails [ToJson α](eqn: α → Float)(f : α → β)(m : β  → 
         ("loss", toJson loss)]
     )
   )
-  Json.arr obs
+  Json.arr obs.toArray
 
 def natAbs : Nat → Float := Float.abs ∘ Nat.toFloat
 

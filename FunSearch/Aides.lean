@@ -97,3 +97,17 @@ def funTailBlock (path: System.FilePath) : IO (String) := do
 #eval enclosedLines "<funtail>" "</funtail>" ["import", "-- <funtail>", "a", "b", "-- </funtail>", "c", "-- <funtail>", "d", "-- </funtail>", "e"]
 
 #eval funBlocks "FunSearch/Examples/SimpleNat.lean" "hard"
+
+partial def exprNat : Expr → TermElabM Nat := fun expr =>
+  do
+    let mvar ←  mkFreshExprMVar (some (mkConst ``Nat))
+    let sExp := mkApp (mkConst ``Nat.succ) mvar
+    if ← isDefEq sExp expr then
+      Term.synthesizeSyntheticMVarsNoPostponing
+      let prev ← exprNat (← whnf mvar)
+      return Nat.succ prev
+    else
+    if ← isDefEq (mkConst `Nat.zero) expr then
+      return Nat.zero
+    else
+      throwError m!"{expr} not a Nat expression"

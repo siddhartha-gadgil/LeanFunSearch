@@ -1,15 +1,49 @@
+import FunSearch.CodeGen
+import FunSearch.FunCode
+
 /-!
 We have some simple functions `Nat → Nat`
 -/
+namespace eg1
 
 -- <funsearch>
-def f1 (n : Nat) : Nat := n + 1
+def fn (n : Nat) : Nat := n + 1
 -- </funsearch>
 
+end eg1
+
+namespace eg2
 -- <funsearch>
-def f2 (n : Nat) : Nat := n * 2
+def fn (n : Nat) : Nat := n * 2
 -- </funsearch>
+end eg2
+
+namespace collatz
 
 -- <funsearch hard>
-def collatz (n: Nat) : Nat := if n % 2 = 0 then n / 2 else 3 * n + 1
+def fn (n: Nat) : Nat := if n % 2 = 0 then n / 2 else 3 * n + 1
 -- </funsearch>
+
+end collatz
+
+namespace funsearch
+
+def fnEqn (f: Nat → Nat) : Nat → Float :=
+  fun n ↦ (f (n + 1) * f (n + 1) - (f (n) * f (n)) - 4 * n - 4).toFloat
+
+def codeHeads : IO <| List String :=
+  funBlocks "FunSearch/Examples/SimpleNat.lean"
+
+#eval codeHeads
+
+def tail := tailCode 1 100 7 `fn ``fnEqn
+
+#eval tail
+
+#check FunCode.getAllIO codeHeads tail `fn
+
+
+#eval FunCode.getAllIO codeHeads tail `fn
+
+
+end funsearch

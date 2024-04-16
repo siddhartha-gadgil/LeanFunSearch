@@ -66,7 +66,7 @@ The equation is expected to take a single argument, the function. So the equatio
 
 We can generalize this to functions `α → β` by using the `sampleα` function for the `sampleFmt` argument and an appropriate absolute value function for `absFn`.
 -/
-def tailCode (lo hi n : Nat)(funcName eqnName: Name)
+def tailCodeFmt (lo hi n : Nat)(funcName eqnName: Name)
     (sampleFmt : MetaM Format := sampleNats lo hi n `sample)
     (absFn : Name := ``natAbs):
     MetaM Format := do
@@ -86,6 +86,13 @@ def tailCode (lo hi n : Nat)(funcName eqnName: Name)
     let fmt := Format.joinSep
         [← sampleFmt, ← ppCommand lossStx, ← ppCommand lossDetailsStx] (Format.line ++ Format.line)
     return fmt
+
+def tailCode (lo hi n : Nat)(funcName eqnName: Name)
+    (sampleFmt : MetaM Format := sampleNats lo hi n `sample)
+    (absFn : Name := ``natAbs):
+    MetaM String := do
+    let fmt ← tailCodeFmt lo hi n funcName eqnName sampleFmt absFn
+    return fmt.pretty
 
 #eval tailCode 1 100 7 `fn `fnEqn
 

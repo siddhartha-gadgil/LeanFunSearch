@@ -42,7 +42,8 @@ def runDefViewM(s: String)(n: Name)(modifyEnv: Bool := false) : MetaM String := 
   return fmt.pretty
 
 def runDefsExprM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM (HashMap Name Expr × MessageLog) := do
-  let (env, logs) ← runFrontendM s modifyEnv
+  let prevEnv ← getEnv
+  let (env, logs) ← runFrontendM s true
   let pairs : List (Name × Expr) ←
     names.filterMapM <| fun n => do
       let seek? : Option ConstantInfo :=  env.find? n
@@ -50,7 +51,12 @@ def runDefsExprM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM 
       | none => return none
       | some seek => match seek.value? with
         | none => return none
-        | some val => return some (n, val)
+        | some val =>
+          logInfo m!"Found definition {n}, {← ppExpr val}, {← ppExpr (← reduce val)}"
+          let val ← reduce val
+          let (r,_) ← simp val (← Simp.Context.mkDefault)
+          return some (n, r.expr)
+  if !modifyEnv then setEnv prevEnv
   return (HashMap.ofList pairs, logs)
 
 def runDefsViewM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM (HashMap Name String × MessageLog) := do
@@ -62,7 +68,9 @@ def runDefsViewM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM 
 
 def runDefsViewM? (s: String)(names: List Name)(modifyEnv: Bool := false):
   MetaM <| Except String (HashMap Name String) := do
+  logInfo m!"Running defs view for {names} in {s}"
   let (vals, logs) ← runDefsViewM s names modifyEnv
+  logInfo m!"Defs view result: {vals.toList}"
   let mut hasErrors : Bool := false
   let mut l := []
   for msg in logs.toList do
@@ -71,8 +79,10 @@ def runDefsViewM? (s: String)(names: List Name)(modifyEnv: Bool := false):
         l := l.append [x]
         hasErrors := true
   if hasErrors then
+    logInfo m!"Errors found: {l}"
     return Except.error <| "Errors found: " ++ l.toString
   else
+    logInfo m!"No errors found, vals : {vals.toList}"
     return Except.ok vals
 
 def checkElabFrontM(s: String) : MetaM <| List String := do

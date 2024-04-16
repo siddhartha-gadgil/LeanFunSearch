@@ -5,12 +5,15 @@ open Lean Elab Term
 
 namespace funsearch
 
+instance : Repr Json where
+  reprPrec json _ := json.pretty 2
+
 structure FunCode where
   funName: Name
   code: String
   loss: Float
   matchData? : Option Json
-  deriving BEq
+  deriving BEq, Repr
 
 def formatLines (lines: List String) : String :=
   lines.foldl (fun acc x => acc ++ "\n" ++ x) ""
@@ -45,14 +48,17 @@ def simpleInstructions (code: FunCode) : List String :=
 def get? (code: String)(funName lossFunction: Name)
   (lossDetails? : Option Name) :
   TermElabM <| Except String FunCode := do
-  let code := leanBlock code.trim
-  let values? ← runDefsViewM? code [funName, `loss, `matchData]
+  let code := leanBlock code.trim ++ "\n"
+  logInfo code
+  let values? ← runDefsViewM? code [`loss, `matchData]
+  logInfo "Ran frontend"
+  logInfo m!"{values?.map (fun values => values.toList)}"
   match values? with
   | Except.error e => return Except.error e
   | Except.ok values =>
-    let funName ← getConstInfo funName
     let loss? := values.find? lossFunction
     let matchData? := lossDetails?.bind values.find?
+    logInfo m!"{loss?}, {matchData?}"
     let matchData? := match matchData? with
     | none => none
     | some matchData =>
@@ -66,11 +72,12 @@ def get? (code: String)(funName lossFunction: Name)
     | Except.ok loss =>
       let funCode : FunCode :=
       {
-        funName := funName.name,
+        funName := funName,
         code := code,
         loss := loss,
         matchData? := matchData?
-    }
+      }
+      logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"
       return Except.ok funCode
 
 def getAll (codes: Array String)(tailCode: String)
@@ -79,14 +86,23 @@ def getAll (codes: Array String)(tailCode: String)
   let mut funCodes := #[]
   for code in codes do
     let funCode? ←
-      get? (code ++ tailCode) funName lossFunction lossDetails?
+      get? (code ++ "\n\n" ++ tailCode) funName lossFunction lossDetails?
     match funCode? with
     | Except.error e =>
       appendLog "elab_errors" <|
         Json.mkObj [("error", e), ("code", code), ("funName", funName.toString), ("tailCode", tailCode)]
+      logError <| "e" ++ "\nin" ++ code ++ "\n\n" ++ tailCode
       pure ()
     | Except.ok funCode => funCodes := funCodes.push funCode
   return funCodes
+
+def getAllIO (codes: IO (List String)) (tailCode: MetaM String)
+  (funName : Name) (lossFunction : Name := `loss)
+  (lossDetails? : Option Name := some `lossDetails) :
+  TermElabM (Array FunCode) := do
+  let codes ← codes
+  logInfo <| "Codes: " ++ codes.toString
+  getAll codes.toArray (← tailCode) funName lossFunction lossDetails?
 
 def messages (server: ChatServer)(objective: String)
   (funName: Name)(funCodes: Array FunCode) : Json :=
