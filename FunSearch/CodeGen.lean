@@ -20,7 +20,7 @@ namespace funsearch
 Sampling natural numbers. To sample other types, we can map from natural numbers.
 -/
 def sampleNatStx (lo hi n: Nat)(sampleFn: Name) :
-    MetaM ((TSyntax `command) × (Syntax.Term) × (List Nat)) := do
+    CoreM ((TSyntax `command) × (Syntax.Term) × (List Nat)) := do
   let sample ←  List.replicate n 0 |>.mapM fun _ =>
     IO.rand lo hi
   let s := sample.toString
@@ -37,14 +37,14 @@ def sampleNatStx (lo hi n: Nat)(sampleFn: Name) :
     throwError m!"{err}"
 
 
-def sampleNats (lo hi n: Nat)(sampleFn: Name) : MetaM (Format × (List Nat)) := do
+def sampleNats (lo hi n: Nat)(sampleFn: Name) : CoreM (Format × (List Nat)) := do
     let (stx, _, sample) ← sampleNatStx lo hi n sampleFn
     return (← ppCommand stx, sample)
 
 #eval (sampleNats 0 100 10 `sample)
 
 def sampleα (lo hi n: Nat)(sampleFn fromNat: Name) :
-        MetaM (Format × (List Syntax.Term)) := do
+        CoreM (Format × (List Syntax.Term)) := do
     let (_, rhs, sampleNat) ← sampleNatStx lo hi n sampleFn
     let fromNatId := mkIdent fromNat
     let sample ← sampleNat.mapM fun n => do
@@ -66,7 +66,7 @@ The equation is expected to take a single argument, the function. So the equatio
 
 We can generalize this to functions `α → β` by using the `sampleα` function for the `sampleFmt` argument and an appropriate absolute value function for `absFn`.
 -/
-def sampleα' [ToString α] (lo hi n: Nat)(sampleFn: Name)(m : Nat → α) : MetaM (Format) := do
+def sampleα' [ToString α] (lo hi n: Nat)(sampleFn: Name)(m : Nat → α) : CoreM (Format) := do
   let sample ←  List.replicate n 0 |>.mapM fun _ => do
     pure <| m (← IO.rand lo hi)
   let s := sample.toString
@@ -87,9 +87,9 @@ def sampleα' [ToString α] (lo hi n: Nat)(sampleFn: Name)(m : Nat → α) : Met
 
 
 def tailCodeFmt' (lo hi n : Nat)(funcName eqnName: Name)
-    (sampleFmt : MetaM (Format × List Nat) := sampleNats lo hi n `sample)
+    (sampleFmt : CoreM (Format × List Nat) := sampleNats lo hi n `sample)
     (absFn : Name := ``natAbs):
-    MetaM Format := do
+    CoreM Format := do
     let sample := mkIdent `sample
     let lossFn := mkIdent `loss
     let eqnId := mkIdent eqnName
@@ -108,9 +108,9 @@ def tailCodeFmt' (lo hi n : Nat)(funcName eqnName: Name)
     return fmt
 
 def tailCode'(lo hi n : Nat)(funcName eqnName: Name)
-    (sampleFmt : MetaM (Format × List Nat) := sampleNats lo hi n `sample)
+    (sampleFmt : CoreM (Format × List Nat) := sampleNats lo hi n `sample)
     (absFn : Name := ``natAbs):
-    MetaM String := do
+    CoreM String := do
     let fmt ← tailCodeFmt' lo hi n funcName eqnName sampleFmt absFn
     return fmt.pretty
 
@@ -126,8 +126,8 @@ The equation is expected to take a single argument, the function. So the equatio
 We can generalize this to functions `α → β` by using the `sampleα` function for the `sampleFmt` argument and an appropriate absolute value function for `absFn`.
 -/
 def tailCodeNatFmt (lo hi n : Nat)(funcName eqnName: Name)
-    (sampleFmt : MetaM (Format × List Nat) := sampleNats lo hi n `sample):
-    MetaM (Format × List (Name × Nat)) := do
+    (sampleFmt : CoreM (Format × List Nat) := sampleNats lo hi n `sample):
+    CoreM (Format × List (Name × Nat)) := do
     let sampleId := mkIdent `sample
     let lossFn := mkIdent `loss
     let eqnId := mkIdent eqnName
@@ -154,17 +154,17 @@ def tailCodeNatFmt (lo hi n : Nat)(funcName eqnName: Name)
     return (fmt, namePairs.toList)
 
 def tailCodeNat (lo hi n : Nat)(funcName eqnName: Name)
-    (sampleFmt : MetaM (Format × List Nat) := sampleNats lo hi n `sample):
-    MetaM (String × List (Name × Nat)) := do
+    (sampleFmt : CoreM (Format × List Nat) := sampleNats lo hi n `sample):
+    CoreM (String × List (Name × Nat)) := do
     let (fmt, pairs) ← tailCodeNatFmt lo hi n funcName eqnName sampleFmt
     return (fmt.pretty, pairs)
 
 #eval tailCodeNat 1 100 7 `fn `fnEqn
 
 def tailCodeFmt (lo hi n : Nat)(funcName eqnName fromNatName: Name)
-    (sampleFmt : MetaM (Format × List Syntax.Term) :=
+    (sampleFmt : CoreM (Format × List Syntax.Term) :=
         sampleα  lo hi n `sample fromNatName):
-    MetaM (Format × List (Name × Syntax.Term)) := do
+    CoreM (Format × List (Name × Syntax.Term)) := do
     let sampleId := mkIdent `sample
     let lossFn := mkIdent `loss
     let eqnId := mkIdent eqnName
@@ -190,9 +190,9 @@ def tailCodeFmt (lo hi n : Nat)(funcName eqnName fromNatName: Name)
     return (fmt, namePairs.toList)
 
 def tailCode (lo hi n : Nat)(funcName eqnName fromNatName: Name)
-    (sampleFmt : MetaM (Format × List Syntax.Term) :=
+    (sampleFmt : CoreM (Format × List Syntax.Term) :=
         sampleα  lo hi n `sample fromNatName):
-    MetaM (String × List (Name × Syntax.Term)) := do
+    CoreM (String × List (Name × Syntax.Term)) := do
     let (fmt, pairs) ← tailCodeFmt lo hi n funcName eqnName fromNatName sampleFmt
     return (fmt.pretty, pairs)
 

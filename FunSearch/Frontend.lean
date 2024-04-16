@@ -22,12 +22,12 @@ def simpleRunFrontend
   let s ← IO.processCommands inputCtx parserState commandState
   pure (s.commandState.env, s.commandState.messages)
 
-def runFrontendM (input: String)(modifyEnv: Bool := false) : MetaM (Environment × MessageLog) := do
+def runFrontendM (input: String)(modifyEnv: Bool := false) : CoreM (Environment × MessageLog) := do
   let (env, logs) ← simpleRunFrontend input (← getEnv)
   if modifyEnv then setEnv env
   return (env, logs)
 
-def runDefExprM(s: String)(n: Name)(modifyEnv: Bool := false) : MetaM Expr := do
+def runDefExprM(s: String)(n: Name)(modifyEnv: Bool := false) : CoreM Expr := do
   let (env, _) ← runFrontendM s modifyEnv
   let seek? : Option ConstantInfo :=  env.find? n
   match seek? with
