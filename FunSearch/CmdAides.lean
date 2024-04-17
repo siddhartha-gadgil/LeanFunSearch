@@ -15,6 +15,13 @@ def EIO.runToIO' (eio: EIO Exception α) : IO α  := do
       let msg ← e.toMessageData.toString
       IO.throwServerError msg
 
+def Meta.runToIO (x : MetaM α)(ctx : Core.Context)(env: Environment) :
+    IO α := do
+  let core := x.run' {}
+  let io? := core.run' ctx {env := env}
+  EIO.runToIO' io?
+
+
 def EIO.spawnToIO (eio: EIO Exception α) : IO <| Task <| IO α  := do
   let task ←  eio.asTask (prio := Task.Priority.max)
   return task.map (fun eio =>
