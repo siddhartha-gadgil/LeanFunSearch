@@ -24,7 +24,7 @@ namespace Evolver
 
 def step (ev: Evolver)(popln : List FunCode) :
     MetaM (List FunCode) := do
-  let sample ← pickByLoss popln (fun code ↦ code.loss) ev.n ev.t
+  let sample ← pickByLoss popln (fun code ↦ code.loss.toFloat) ev.n ev.t
   let messages :=
     FunCode.messages ev.server ev.objective sample.toArray
   let response ← ev.server.query messages ev.params
@@ -71,7 +71,7 @@ def withNatSample (objective: String)(lo hi n : Nat)
   return (ev, popln.toList)
 
 def boundedEvolution (ev: Evolver)(popln : List FunCode)
-  (steps: Nat)(acceptableLoss : Float := 0.0) :
+  (steps: Nat)(acceptableLoss : Nat := 0) :
   MetaM (List FunCode) := do
   if popln.any fun code ↦ code.loss < acceptableLoss then
     return popln.filter fun code ↦ code.loss < acceptableLoss

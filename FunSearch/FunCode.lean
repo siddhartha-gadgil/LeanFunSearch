@@ -11,7 +11,7 @@ instance : Repr Json where
 structure FunCode where
   funName: Name
   code: String
-  loss: Float
+  loss: Nat
   matchData? : Option Json
   deriving BEq, Repr
 
@@ -38,7 +38,7 @@ def simpleInstructions (code: FunCode) : List String :=
         data.compress]
     | none => []
   ["", "---",
-    "**Loss:**" ++ code.loss.toString] ++
+    "**Loss:**" ++ (toString code.loss)] ++
     matchLines ++ [
     "```",
     code.code,
@@ -63,7 +63,7 @@ def getLoss? (code: String)(tailCode: String)(funName lossFunction: Name) :
       {
         funName := funName,
         code := code,
-        loss := lossNat.toFloat,
+        loss := lossNat,
         matchData? := none
       }
       -- logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"
@@ -94,7 +94,7 @@ def getNatfnDetails? (evalPoints: List (Name × Nat)) (code: String)(tailCode: S
       {
         funName := funName,
         code := code,
-        loss := lossNat.toFloat,
+        loss := lossNat,
         matchData? := some <| Json.arr pointErrors.toArray
       }
       -- logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"

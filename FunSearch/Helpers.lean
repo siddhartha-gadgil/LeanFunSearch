@@ -19,20 +19,20 @@ structure CodeParams where
   funName : Name
   lossFunction: Name := `loss
 
-def sampleLoss (eqn: α → Float)(f : α → β)(m : β  → Float)(sample : List α) : Nat :=
+def sampleLoss (eqn: α → Nat)(f : α → β)(m : β  → Nat)(sample : List α) : Nat :=
   let n := sample.length
-  let sum := sample.foldl (init := 0.0)
-    (fun acc x => acc + (eqn x / (1.0 + m (f x))))
-  (sum * 100 / n.toFloat) |>.toUSize |>.toNat
+  let sum := sample.foldl (init := 0)
+    (fun acc x => acc + (eqn x / (1 + m (f x))))
+  (sum * 100 / n)
 
 
 
-def sampleLossDetails [ToJson α](eqn: α → Float)(f : α → β)(m : β  → Float)
+def sampleLossDetails [ToJson α](eqn: α → Nat)(f : α → β)(m : β  → Nat)
   (sample : List α) : Json :=
   let obs := (
     sample.map (fun x =>
       let error := eqn x
-      let loss := error / (1.0 + m (f x))
+      let loss := error / (1 + m (f x))
       Json.mkObj [
         ("x", toJson x),
         ("equation-error", toJson error),
