@@ -4,11 +4,14 @@ import FunSearch.CodeGen
 import FunSearch.Frontend
 import FunSearch.FunCode
 import FunSearch.Helpers
+import Mathlib.Data.Stream.Defs
+import Mathlib.Data.LazyList.Basic
+import Mathlib.Data.Seq.Seq
 open Lean Meta Elab Term
 
 namespace funsearch
 
-structure EvolveParams extends CodeParams where
+structure Evolver extends CodeParams where
   objective: String
   tailCode : String
   server : ChatServer := ChatServer.azure
@@ -17,19 +20,53 @@ structure EvolveParams extends CodeParams where
   t : Float := 0.8
   matchData : Bool := false
 
-def evolveStep (ev: EvolveParams)(popln : List FunCode) :
+namespace Evolver
+
+def step (ev: Evolver)(popln : List FunCode) :
     MetaM (List FunCode) := do
   let sample ← pickByLoss popln (fun code ↦ code.loss) ev.n ev.t
   let messages :=
-    FunCode.messages ev.server ev.objective ev.funName sample.toArray
+    FunCode.messages ev.server ev.objective sample.toArray
   let response ← ev.server.query messages ev.params
   let outputs ←  ChatServer.stringsFromJson response
-  let newCodes ←
+  let newCodes ← -- uses incorrect getAll function
     FunCode.getAll outputs ev.tailCode ev.funName ev.lossFunction ev.lossDetails?
   return newCodes.toList ++ popln |>.eraseDups
 
+def stream (ev: Evolver)(popln : List FunCode) :
+    Stream' (MetaM (List FunCode)) :=
+    fun n ↦
+    match n with
+    | 0 => return popln
+    | m + 1 => do
+      let prev ← stream ev popln m
+      let popln ← step ev prev
+      return popln
 
-def evolution (ev: EvolveParams)(popln : List FunCode)
+unsafe def lazyList (ev: Evolver)(popln : List FunCode) :
+    LazyList (MetaM (List FunCode)) :=
+    Stream'.Seq.toLazyList (stream ev popln)
+
+def fromFile (objective: String)(funName : Name)
+  (lossFunction: Name := `loss)
+  (lossDetails? : Option Name := none)
+  (file: System.FilePath) : MetaM (Evolver × (List FunCode)) := do
+  let codes ← funBlocks file
+  let tail ← funTailBlock file
+  let popln ←
+      FunCode.getAll codes.toArray tail funName lossFunction lossDetails?
+  let ev : Evolver :=
+    {objective := objective, funName := funName, tailCode := tail, lossFunction := lossFunction, lossDetails? := lossDetails?}
+  return (ev, popln.toList)
+
+def withNatSample (objective: String)(lo hi n : Nat)
+  (funcName eqnName: Name)(file: System.FilePath) :
+  MetaM (Evolver × (List FunCode)) := do
+  let codes ← funBlocks file
+  let (tail, pairs) ← tailCodeNat lo hi n funcName eqnName
+  sorry
+
+def boundedEvolution (ev: Evolver)(popln : List FunCode)
   (steps: Nat)(acceptableLoss : Float := 0.0) :
   MetaM (List FunCode) := do
   if popln.any fun code ↦ code.loss < acceptableLoss then
@@ -38,23 +75,13 @@ def evolution (ev: EvolveParams)(popln : List FunCode)
   match steps with
   | 0 => return popln
   | n + 1 => do
-    let popln ← evolveStep ev popln
+    let popln ← step ev popln
     let minLoss? := popln.map (fun code ↦ code.loss) |>.minimum?
     IO.println "Step completed"
     IO.println s!"minimum loss: {minLoss?}"
     IO.println s!"population: {popln.length}"
     IO.println s!"steps remaining: {steps}"
-    evolution ev popln n acceptableLoss
+    boundedEvolution ev popln n acceptableLoss
 
-def runEvolution (objective: String)(funName : Name)
-  (lossFunction: Name := `loss)
-  (lossDetails? : Option Name := none)
-  (file: System.FilePath)(steps: Nat := 100)
-  (acceptableLoss : Float := 0.0) : MetaM (List FunCode) := do
-  let codes ← funBlocks file
-  let tail ← funTailBlock file
-  let popln ←
-      FunCode.getAll codes.toArray tail funName lossFunction lossDetails?
-  let ev : EvolveParams :=
-    {objective := objective, funName := funName, tailCode := tail, lossFunction := lossFunction, lossDetails? := lossDetails?}
-  evolution ev popln.toList steps acceptableLoss
+
+end Evolver
