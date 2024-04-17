@@ -49,3 +49,10 @@ def threadNum : IO Nat := do
   match o with
   | Except.ok a => return Except.ok (← f a)
   | Except.error e => return Except.error e
+
+-- #eval Lean.moduleNameOfFileName "FunSearch/Examples/SimpleNat.lean" (System.FilePath.mk "/home/gadgil/code/LeanFunSearch")
+
+def modulePath (moduleName: Name) : IO (System.FilePath) := do
+  let pieces := moduleName.components.map
+    (fun n => (n.toString : System.FilePath))
+  return pieces.foldl (· / ·) (← IO.currentDir)

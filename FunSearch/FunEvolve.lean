@@ -47,21 +47,23 @@ unsafe def lazyList (ev: Evolver)(popln : List FunCode) :
     LazyList (MetaM (List FunCode)) :=
     Stream'.Seq.toLazyList (stream ev popln)
 
-def fromFileSimple (objective: String)(funName : Name)
+def fromFileSimple (funName : Name)
   (lossFunction: Name := `loss)
   (file: System.FilePath) : MetaM (Evolver × (List FunCode)) := do
   let codes ← funBlocks file
   let tail ← funTailBlock file
+  let objective ← funObjectiveBlock file
   let popln ←
       FunCode.getAll codes.toArray tail funName lossFunction
   let ev : Evolver :=
     {objective := objective, funName := funName, tailCode := tail, lossFunction := lossFunction}
   return (ev, popln.toList)
 
-def withNatSample (objective: String)(lo hi n : Nat)
+def withNatSample (lo hi n : Nat)
   (funcName eqnName: Name)(file: System.FilePath) :
   MetaM (Evolver × (List FunCode)) := do
   let codes ← funBlocks file
+  let objective ← funObjectiveBlock file
   let (tail, pairs) ← tailCodeNat lo hi n funcName eqnName
   let popln ←
       FunCode.getAll codes.toArray tail funcName `loss
@@ -70,10 +72,11 @@ def withNatSample (objective: String)(lo hi n : Nat)
     {objective := objective, funName := funcName, tailCode := tail, lossFunction := `loss, get? := FunCode.getNatfnDetails? pairs}
   return (ev, popln.toList)
 
-def withSample (objective: String)(lo hi n : Nat)
+def withSample (lo hi n : Nat)
   (funcName eqnName ofNat: Name)(file: System.FilePath) :
   MetaM (Evolver × (List FunCode)) := do
   let codes ← funBlocks file
+  let objective ← funObjectiveBlock file
   let (tail, pairs) ← tailCodeSample lo hi n funcName eqnName ofNat
   let popln ←
       FunCode.getAll codes.toArray tail funcName `loss
@@ -82,7 +85,7 @@ def withSample (objective: String)(lo hi n : Nat)
     {objective := objective, funName := funcName, tailCode := tail, lossFunction := `loss, get? := FunCode.getSampleDetails? pairs}
   return (ev, popln.toList)
 
-def boundedEvolutionAux (ev: Evolver)(popln : List FunCode)
+def runAux (ev: Evolver)(popln : List FunCode)
   (steps: Nat)(acceptableLoss : Nat := 0)
   (handle? : Option IO.FS.Handle := none) :
   MetaM (List FunCode) := do
@@ -104,7 +107,7 @@ def boundedEvolutionAux (ev: Evolver)(popln : List FunCode)
     IO.eprintln s!"minimum loss: {minLoss?}"
     IO.eprintln s!"population: {popln.length}"
     IO.eprintln s!"steps remaining: {steps}"
-    boundedEvolutionAux ev popln n acceptableLoss handle?
+    runAux ev popln n acceptableLoss handle?
 
 def getPopln? (outFile : System.FilePath) : IO (Option (List FunCode)) := do
   if ← outFile.pathExists then
@@ -115,14 +118,15 @@ def getPopln? (outFile : System.FilePath) : IO (Option (List FunCode)) := do
   else
     return none
 
-def boundedEvolution (ev: Evolver)(popln : List FunCode)
-    (steps: Nat)(acceptableLoss : Nat := 0)
-    (outfile? : Option System.FilePath := none) :
+def run (ev: Evolver)(popln : List FunCode)
+    (steps: Nat)
+    (outfile? : Option System.FilePath := none)
+    (acceptableLoss : Nat := 0) :
     MetaM (List FunCode) := do
-  let popln?? ←  outfile?.mapM fun out => getPopln? out
-  let popln? := Option.join popln??
+  let popln? :=
+    (← outfile?.mapM fun out => getPopln? out).join
   let h ←  outfile?.mapM fun f => IO.FS.Handle.mk f .append
-  boundedEvolutionAux ev (popln?.getD popln) steps acceptableLoss h
+  runAux ev (popln?.getD popln) steps acceptableLoss h
 
 
 end Evolver

@@ -51,8 +51,7 @@ def sampleα (lo hi n: Nat)(sampleFn fromNat: Name) :
         let n := Syntax.mkNumLit (toString n)
         `($fromNatId $n)
     let sampleId := mkIdent sampleFn
-    let lmId := mkIdent ``List.map
-    let cmd ← `(command|def $sampleId  := $lmId $fromNatId $rhs)
+    let cmd ← `(command|def $sampleId  := List.map $fromNatId $rhs)
     return (← ppCommand cmd, sample)
 
 /--
