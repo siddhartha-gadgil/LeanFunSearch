@@ -3,6 +3,14 @@ import FunSearch.FunCode
 
 /-!
 We have some simple functions `Nat → Nat`
+
+## FunObjective
+
+Find a function `fn: Nat → Nat` that satisfies $f(n+ 1)^2 = f(n)^2 + 4n + 8$.
+
+## EndObjective
+
+
 -/
 namespace eg1
 
@@ -39,7 +47,11 @@ def fnEqnNat (f: Nat → Nat) : Nat → Nat :=
 def codeHeads : IO <| List String :=
   funBlocks "FunSearch/Examples/SimpleNat.lean"
 
+def objective := funObjectiveBlock "FunSearch/Examples/SimpleNat.lean"
+
 #eval codeHeads
+
+#eval objective
 
 def tail := tailCodeNat 1 100 7 `fn ``fnEqnNat
 
@@ -53,7 +65,7 @@ def msgs : MetaM Json := do
   let server := ChatServer.azure
   let msgs :=
     FunCode.messages server
-      "Find a function `fn: Nat → Nat` that satisfies $f(n+ 1)^2 = f(n)^2 + 4n + 8$." (← startCode)
+      (← objective) (← startCode)
   return msgs
 
 #eval msgs
@@ -62,7 +74,7 @@ def response : MetaM Json := do
   let server := ChatServer.azure
   let msgs :=
     FunCode.messages server
-      "`fn: Nat → Nat` satsfies $f(n+ 1)^2 = f(n)^2 + 4n + 8$" (← startCode)
+      (← objective) (← startCode)
   let response ← server.query msgs {n := 3}
   return response
 

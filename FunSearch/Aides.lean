@@ -92,7 +92,9 @@ def enclosedLines (start stop: String) (lines: List String) :
 def enclosedLines' (start stop: String) (lines: List String) :
   List String :=
   let lines := (lines.splitOnP (fun s => s.startsWith start))[1]!.takeWhile (fun s => !s.startsWith stop)
-  lines.dropWhile (fun s => s.trim.isEmpty)
+  let lines:= lines.dropWhile (fun s => s.trim.isEmpty)
+  let lines:= lines.reverse.dropWhile (fun s => s.trim.isEmpty) |>.reverse
+  lines
 
 def funTailBlock (path: System.FilePath) : IO (String) := do
   let lines ← IO.FS.lines path
@@ -101,8 +103,8 @@ def funTailBlock (path: System.FilePath) : IO (String) := do
 
 def funObjectiveBlock (path: System.FilePath) : IO (String) := do
   let lines ← IO.FS.lines path
-  let blocks := enclosedLines' "## FunObjective" "#" lines.toList
-  return blocks.foldl (fun s1 s2 => s1 ++ "\n" ++ s2) ""
+  let blocks := enclosedLines' "## FunObjective" "## EndObjective" lines.toList
+  return blocks.foldl (fun s1 s2 => s1 ++ "\n" ++ s2) "" |>.trim
 
 #eval enclosedLines "<funtail>" "</funtail>" ["import", "-- <funtail>", "a", "b", "-- </funtail>", "c", "-- <funtail>", "d", "-- </funtail>", "e"]
 
