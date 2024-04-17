@@ -13,7 +13,7 @@ structure FunCode where
   code: String
   loss: Nat
   matchData? : Option Json
-  deriving BEq, Repr
+  deriving BEq, Repr, ToJson, FromJson
 
 def formatLines (lines: List String) : String :=
   lines.foldl (fun acc x => acc ++ "\n" ++ x) ""
@@ -90,6 +90,35 @@ def getNatfnDetails? (evalPoints: List (Name × Nat)) (code: String)(tailCode: S
         let value? := values.find? name
         value?.map (fun value =>
           Json.mkObj [("point", nat), ("error", value)])
+      let funCode : FunCode :=
+      {
+        funName := funName,
+        code := code,
+        loss := lossNat,
+        matchData? := some <| Json.arr pointErrors.toArray
+      }
+      -- logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"
+      return Except.ok funCode
+  catch e => return Except.error (← e.toMessageData.toString)
+
+def getSampleDetails? (evalPoints: List (Name × Format)) (code: String)(tailCode: String)(funName lossFunction: Name) :
+  MetaM <| Except String FunCode := do
+  let fullCode := leanBlock code.trim ++ "\n\n" ++ tailCode
+  let pairs := evalPoints
+  let names := pairs.map (·.1)
+  try
+    let (values, logs) ← runDefsNatM fullCode (`loss :: names)
+    for msg in logs.toList do
+      if msg.severity == MessageSeverity.error then
+        logWarning msg.data
+    let loss? := values.find? lossFunction
+    match loss? with
+    | none => return Except.error "Expected loss to be defined"
+    | some lossNat =>
+      let pointErrors := pairs.filterMap <| fun (name, fmt) =>
+        let value? := values.find? name
+        value?.map (fun value =>
+          Json.mkObj [("point", fmt.pretty), ("error", value)])
       let funCode : FunCode :=
       {
         funName := funName,

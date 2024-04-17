@@ -161,10 +161,10 @@ def tailCodeNat (lo hi n : Nat)(funcName eqnName: Name)
 
 #eval tailCodeNat 1 100 7 `fn `fnEqn
 
-def tailCodeFmt (lo hi n : Nat)(funcName eqnName fromNatName: Name)
+def tailCodeFmt (lo hi n : Nat)(funcName eqnName ofNat: Name)
     (sampleFmt : CoreM (Format × List Syntax.Term) :=
-        sampleα  lo hi n `sample fromNatName):
-    CoreM (Format × List (Name × Syntax.Term)) := do
+        sampleα  lo hi n `sample ofNat):
+    CoreM (Format × List (Name × Format)) := do
     let sampleId := mkIdent `sample
     let lossFn := mkIdent `loss
     let eqnId := mkIdent eqnName
@@ -176,12 +176,13 @@ def tailCodeFmt (lo hi n : Nat)(funcName eqnName fromNatName: Name)
         `(command| def $lossFn : $nat := $sampleLossFn $eqn $sampleId)
     let lossFmt ← ppCommand lossStx
     let mut commands := #[(← sampleFmt).1, lossFmt]
-    let mut namePairs : Array (Name × Syntax.Term) := #[]
+    let mut namePairs : Array (Name × Format) := #[]
     let mut i := 0
     for jval in (← sampleFmt).2 do
         let name := s!"lossDataPoint_{i}".toName
         let nameId := mkIdent name
-        namePairs := namePairs.push (name, jval)
+        let p ← PrettyPrinter.ppTerm jval
+        namePairs := namePairs.push (name, p)
         let cmd ← `(command| def $nameId : $nat := $eqn $jval)
         commands := commands.push (← ppCommand cmd)
         i := i + 1
@@ -189,14 +190,15 @@ def tailCodeFmt (lo hi n : Nat)(funcName eqnName fromNatName: Name)
         commands.toList (Format.line ++ Format.line)
     return (fmt, namePairs.toList)
 
-def tailCode (lo hi n : Nat)(funcName eqnName fromNatName: Name)
+def tailCode (lo hi n : Nat)(funcName eqnName ofNat: Name)
     (sampleFmt : CoreM (Format × List Syntax.Term) :=
-        sampleα  lo hi n `sample fromNatName):
-    CoreM (String × List (Name × Syntax.Term)) := do
-    let (fmt, pairs) ← tailCodeFmt lo hi n funcName eqnName fromNatName sampleFmt
+        sampleα  lo hi n `sample ofNat):
+    CoreM (String × List (Name × Format)) := do
+    let (fmt, pairs) ← tailCodeFmt lo hi n funcName eqnName ofNat sampleFmt
     return (fmt.pretty, pairs)
 
-#eval tailCode 1 100 7 `fn `fnEqn ``Int.toNat
+#eval tailCode 1 100 7 `fn `fnEqn ``Int.ofNat
+
 
 /-!
 Other code generation. Currently not used.

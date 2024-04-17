@@ -69,3 +69,7 @@ def response : MetaM Json := do
 -- #eval response
 
 end funsearch
+
+#eval Lean.moduleNameOfFileName "FunSearch/Examples/SimpleNat.lean"
+    (System.FilePath.mk "/home/gadgil/code/LeanFunSearch")
+#eval IO.currentDir
