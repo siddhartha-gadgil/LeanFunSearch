@@ -45,61 +45,35 @@ def simpleInstructions (code: FunCode) : List String :=
     "```"
   ]
 
-def get? (code: String)(funName lossFunction: Name)
-  (lossDetails? : Option Name) :
+def getLoss? (code: String)(tailCode: String)(funName lossFunction: Name) :
   MetaM <| Except String FunCode := do
-  let code := leanBlock code.trim ++ "\n"
-  logInfo code
-  let values? ← runDefsViewM? code [`loss, `matchData]
-  logInfo "Ran frontend"
-  logInfo m!"{values?.map (fun values => values.toList)}"
-  match values? with
-  | Except.error e => return Except.error e
-  | Except.ok values =>
+  let fullCode := leanBlock code.trim ++ "\n\n" ++ tailCode
+  -- logInfo fullCode
+  -- logInfo m!"{names}"
+  try
+    let (values, logs) ← runDefsNatM fullCode [`loss]
+    for msg in logs.toList do
+      if msg.severity == MessageSeverity.error then
+        logWarning msg.data
     let loss? := values.find? lossFunction
-    let matchData? := lossDetails?.bind values.find?
-    logInfo m!"{loss?}, {matchData?}"
-    let matchData? := match matchData? with
-    | none => none
-    | some matchData =>
-      Json.parse matchData |>.toOption
     match loss? with
     | none => return Except.error "Expected loss to be defined"
-    | some lossString =>
-    match parseFloat lossString with
-    | Except.error e =>
-      return Except.error s!"Error {e} while parsing loss {lossString}"
-    | Except.ok loss =>
+    | some lossNat =>
       let funCode : FunCode :=
       {
         funName := funName,
         code := code,
-        loss := loss,
-        matchData? := matchData?
+        loss := lossNat.toFloat,
+        matchData? := none
       }
-      logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"
+      -- logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"
       return Except.ok funCode
+  catch e => return Except.error (← e.toMessageData.toString)
 
-def getAll (codes: Array String)(tailCode: String)
-  (funName lossFunction : Name)(lossDetails? : Option Name) :
-  MetaM <| (Array FunCode) := do
-  let mut funCodes := #[]
-  for code in codes do
-    let funCode? ←
-      get? (code ++ "\n\n" ++ tailCode) funName lossFunction lossDetails?
-    match funCode? with
-    | Except.error e =>
-      appendLog "elab_errors" <|
-        Json.mkObj [("error", e), ("code", code), ("funName", funName.toString), ("tailCode", tailCode)]
-      logError <| "e" ++ "\nin" ++ code ++ "\n\n" ++ tailCode
-      pure ()
-    | Except.ok funCode => funCodes := funCodes.push funCode
-  return funCodes
-
-def getNat? (code: String)(tailCode: String × List (Name × Nat))(funName lossFunction: Name) :
+def getNatfnDetails? (evalPoints: List (Name × Nat)) (code: String)(tailCode: String)(funName lossFunction: Name) :
   MetaM <| Except String FunCode := do
-  let fullCode := leanBlock code.trim ++ "\n\n" ++ tailCode.1
-  let pairs := tailCode.2
+  let fullCode := leanBlock code.trim ++ "\n\n" ++ tailCode
+  let pairs := evalPoints
   let names := pairs.map (·.1)
   -- logInfo fullCode
   -- logInfo m!"{names}"
@@ -127,22 +101,30 @@ def getNat? (code: String)(tailCode: String × List (Name × Nat))(funName lossF
       return Except.ok funCode
   catch e => return Except.error (← e.toMessageData.toString)
 
-
-def getAllNat (codes: Array String)(tailCode: String × List (Name × Nat))
-  (funName lossFunction : Name) :
+def getAll (codes: Array String)(tailCode: String)
+  (funName lossFunction : Name)
+  (get? : String → String → Name → Name →
+    MetaM (Except String FunCode) := getLoss?) :
   MetaM <| (Array FunCode) := do
   let mut funCodes := #[]
   for code in codes do
     let funCode? ←
-      getNat? code tailCode funName lossFunction
+      get? code tailCode funName lossFunction
     match funCode? with
     | Except.error e =>
       appendLog "elab_errors" <|
-        Json.mkObj [("error", e), ("code", code), ("funName", funName.toString), ("tailCode", tailCode.1)]
-      logError <| "e" ++ "\nin" ++ code ++ "\n\n" ++ tailCode.1
+        Json.mkObj [("error", e), ("code", code), ("funName", funName.toString), ("tailCode", tailCode)]
+      logError <| "e" ++ "\nin" ++ code ++ "\n\n" ++ tailCode
       pure ()
     | Except.ok funCode => funCodes := funCodes.push funCode
   return funCodes
+
+
+def getAllNatFn (codes: Array String)(tailCode: String)(evalPoints: List (Name × Nat))
+  (funName lossFunction : Name) :
+  MetaM <| (Array FunCode) :=
+  getAll codes tailCode funName lossFunction
+   (getNatfnDetails? evalPoints)
 
 
 def getAllIO (codes: IO (List String))
@@ -150,8 +132,7 @@ def getAllIO (codes: IO (List String))
     (funName : Name) (lossFunction : Name := `loss) :
     MetaM (Array FunCode) := do
   let codes ← codes
-  -- logInfo <| "Codes: " ++ codes.toString
-  getAllNat codes.toArray (← tailCode) funName lossFunction
+  getAllNatFn codes.toArray (← tailCode).1 (← tailCode).2 funName lossFunction
 
 def messages (server: ChatServer)(objective: String)
   (funCodes: Array FunCode) : Json :=

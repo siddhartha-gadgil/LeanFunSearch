@@ -18,8 +18,8 @@ structure Evolver extends CodeParams where
   params : ChatParams := {n := 3}
   n : Nat := 3
   t : Float := 0.8
-  matchData : Bool := false
-
+  get? : String → String → Name → Name →
+    MetaM (Except String FunCode) := FunCode.getLoss?
 namespace Evolver
 
 def step (ev: Evolver)(popln : List FunCode) :
@@ -29,8 +29,8 @@ def step (ev: Evolver)(popln : List FunCode) :
     FunCode.messages ev.server ev.objective sample.toArray
   let response ← ev.server.query messages ev.params
   let outputs ←  ChatServer.stringsFromJson response
-  let newCodes ← -- uses incorrect getAll function
-    FunCode.getAll outputs ev.tailCode ev.funName ev.lossFunction ev.lossDetails?
+  let newCodes ←
+    FunCode.getAll outputs ev.tailCode ev.funName ev.lossFunction ev.get?
   return newCodes.toList ++ popln |>.eraseDups
 
 def stream (ev: Evolver)(popln : List FunCode) :
@@ -47,16 +47,15 @@ unsafe def lazyList (ev: Evolver)(popln : List FunCode) :
     LazyList (MetaM (List FunCode)) :=
     Stream'.Seq.toLazyList (stream ev popln)
 
-def fromFile (objective: String)(funName : Name)
+def fromFileSimple (objective: String)(funName : Name)
   (lossFunction: Name := `loss)
-  (lossDetails? : Option Name := none)
   (file: System.FilePath) : MetaM (Evolver × (List FunCode)) := do
   let codes ← funBlocks file
   let tail ← funTailBlock file
   let popln ←
-      FunCode.getAll codes.toArray tail funName lossFunction lossDetails?
+      FunCode.getAll codes.toArray tail funName lossFunction
   let ev : Evolver :=
-    {objective := objective, funName := funName, tailCode := tail, lossFunction := lossFunction, lossDetails? := lossDetails?}
+    {objective := objective, funName := funName, tailCode := tail, lossFunction := lossFunction}
   return (ev, popln.toList)
 
 def withNatSample (objective: String)(lo hi n : Nat)
@@ -64,7 +63,12 @@ def withNatSample (objective: String)(lo hi n : Nat)
   MetaM (Evolver × (List FunCode)) := do
   let codes ← funBlocks file
   let (tail, pairs) ← tailCodeNat lo hi n funcName eqnName
-  sorry
+  let popln ←
+      FunCode.getAll codes.toArray tail funcName `loss
+        (FunCode.getNatfnDetails? pairs)
+  let ev : Evolver :=
+    {objective := objective, funName := funcName, tailCode := tail, lossFunction := `loss, get? := FunCode.getNatfnDetails? pairs}
+  return (ev, popln.toList)
 
 def boundedEvolution (ev: Evolver)(popln : List FunCode)
   (steps: Nat)(acceptableLoss : Float := 0.0) :

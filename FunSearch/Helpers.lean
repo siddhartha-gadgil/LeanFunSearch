@@ -18,7 +18,6 @@ def sampleLossNat (eqn: α  → Nat)(sample : List α) : Nat :=
 structure CodeParams where
   funName : Name
   lossFunction: Name := `loss
-  lossDetails? : Option Name := some `lossDetails
 
 def sampleLoss (eqn: α → Float)(f : α → β)(m : β  → Float)(sample : List α) : Nat :=
   let n := sample.length
