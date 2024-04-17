@@ -70,10 +70,29 @@ def withNatSample (objective: String)(lo hi n : Nat)
     {objective := objective, funName := funcName, tailCode := tail, lossFunction := `loss, get? := FunCode.getNatfnDetails? pairs}
   return (ev, popln.toList)
 
-def boundedEvolution (ev: Evolver)(popln : List FunCode)
-  (steps: Nat)(acceptableLoss : Nat := 0) :
+def withSample (objective: String)(lo hi n : Nat)
+  (funcName eqnName ofNat: Name)(file: System.FilePath) :
+  MetaM (Evolver × (List FunCode)) := do
+  let codes ← funBlocks file
+  let (tail, pairs) ← tailCodeSample lo hi n funcName eqnName ofNat
+  let popln ←
+      FunCode.getAll codes.toArray tail funcName `loss
+        (FunCode.getSampleDetails? pairs)
+  let ev : Evolver :=
+    {objective := objective, funName := funcName, tailCode := tail, lossFunction := `loss, get? := FunCode.getSampleDetails? pairs}
+  return (ev, popln.toList)
+
+def boundedEvolutionAux (ev: Evolver)(popln : List FunCode)
+  (steps: Nat)(acceptableLoss : Nat := 0)
+  (handle? : Option IO.FS.Handle := none) :
   MetaM (List FunCode) := do
-  if popln.any fun code ↦ code.loss < acceptableLoss then
+  match handle? with
+  | none => pure ()
+  | some handle =>
+    let js := toJson popln
+    handle.putStrLn js.compress
+    handle.flush
+  if popln.any fun code ↦ code.loss ≤ acceptableLoss then
     return popln.filter fun code ↦ code.loss < acceptableLoss
   else
   match steps with
@@ -81,11 +100,29 @@ def boundedEvolution (ev: Evolver)(popln : List FunCode)
   | n + 1 => do
     let popln ← step ev popln
     let minLoss? := popln.map (fun code ↦ code.loss) |>.minimum?
-    IO.println "Step completed"
-    IO.println s!"minimum loss: {minLoss?}"
-    IO.println s!"population: {popln.length}"
-    IO.println s!"steps remaining: {steps}"
-    boundedEvolution ev popln n acceptableLoss
+    IO.eprintln "Step completed"
+    IO.eprintln s!"minimum loss: {minLoss?}"
+    IO.eprintln s!"population: {popln.length}"
+    IO.eprintln s!"steps remaining: {steps}"
+    boundedEvolutionAux ev popln n acceptableLoss handle?
+
+def getPopln? (outFile : System.FilePath) : IO (Option (List FunCode)) := do
+  if ← outFile.pathExists then
+    let lines ← IO.FS.lines outFile
+    let lines := lines.filter fun l => !l.isEmpty
+    let js? := lines[lines.size -1]?
+    return js?.bind (fun js => (fromJson? js).toOption)
+  else
+    return none
+
+def boundedEvolution (ev: Evolver)(popln : List FunCode)
+    (steps: Nat)(acceptableLoss : Nat := 0)
+    (outfile? : Option System.FilePath := none) :
+    MetaM (List FunCode) := do
+  let popln?? ←  outfile?.mapM fun out => getPopln? out
+  let popln? := Option.join popln??
+  let h ←  outfile?.mapM fun f => IO.FS.Handle.mk f .append
+  boundedEvolutionAux ev (popln?.getD popln) steps acceptableLoss h
 
 
 end Evolver

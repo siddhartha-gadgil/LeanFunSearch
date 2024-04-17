@@ -161,7 +161,7 @@ def tailCodeNat (lo hi n : Nat)(funcName eqnName: Name)
 
 #eval tailCodeNat 1 100 7 `fn `fnEqn
 
-def tailCodeFmt (lo hi n : Nat)(funcName eqnName ofNat: Name)
+def tailCodeSampleFmt (lo hi n : Nat)(funcName eqnName ofNat: Name)
     (sampleFmt : CoreM (Format × List Syntax.Term) :=
         sampleα  lo hi n `sample ofNat):
     CoreM (Format × List (Name × Format)) := do
@@ -190,14 +190,14 @@ def tailCodeFmt (lo hi n : Nat)(funcName eqnName ofNat: Name)
         commands.toList (Format.line ++ Format.line)
     return (fmt, namePairs.toList)
 
-def tailCode (lo hi n : Nat)(funcName eqnName ofNat: Name)
+def tailCodeSample (lo hi n : Nat)(funcName eqnName ofNat: Name)
     (sampleFmt : CoreM (Format × List Syntax.Term) :=
         sampleα  lo hi n `sample ofNat):
     CoreM (String × List (Name × Format)) := do
-    let (fmt, pairs) ← tailCodeFmt lo hi n funcName eqnName ofNat sampleFmt
+    let (fmt, pairs) ← tailCodeSampleFmt lo hi n funcName eqnName ofNat sampleFmt
     return (fmt.pretty, pairs)
 
-#eval tailCode 1 100 7 `fn `fnEqn ``Int.ofNat
+#eval tailCodeSample 1 100 7 `fn `fnEqn ``Int.ofNat
 
 
 /-!
