@@ -48,8 +48,6 @@ def simpleInstructions (code: FunCode) : List String :=
 def getLoss? (code: String)(tailCode: String)(funName lossFunction: Name) :
   MetaM <| Except String FunCode := do
   let fullCode := leanBlock code.trim ++ "\n\n" ++ tailCode
-  -- logInfo fullCode
-  -- logInfo m!"{names}"
   try
     let (values, logs) ← runDefsNatM fullCode [`loss]
     for msg in logs.toList do
@@ -66,69 +64,58 @@ def getLoss? (code: String)(tailCode: String)(funName lossFunction: Name) :
         loss := lossNat,
         matchData? := none
       }
-      -- logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"
+      return Except.ok funCode
+  catch e => return Except.error (← e.toMessageData.toString)
+
+def natDetails (evalPoints: List (Name × Nat))
+  (valueMap: HashMap Name Nat) : Json :=
+  let pointErrors := evalPoints.filterMap <| fun (name, nat) =>
+        let value? := valueMap.find? name
+        value?.map (fun value =>
+          Json.mkObj [("point", nat), ("error", value)])
+  Json.arr pointErrors.toArray
+
+def evalDetails (evalPoints: List (Name × Format))
+  (valueMap: HashMap Name Nat) : Json :=
+  let pointErrors := evalPoints.filterMap <| fun (name, fmt) =>
+        let value? := valueMap.find? name
+        value?.map (fun value =>
+          Json.mkObj [("point", fmt.pretty), ("error", value)])
+  Json.arr pointErrors.toArray
+
+def getLossDetails? (natVars: List Name)
+  (details : HashMap Name Nat → Json)
+  (code: String)(tailCode: String)(funName lossFunction: Name) :
+  MetaM <| Except String FunCode := do
+  let fullCode := leanBlock code.trim ++ "\n\n" ++ tailCode
+  try
+    let (valueMap, logs) ← runDefsNatM fullCode (lossFunction :: natVars)
+    for msg in logs.toList do
+      if msg.severity == MessageSeverity.error then
+        logWarning msg.data
+    let loss? := valueMap.find? lossFunction
+    match loss? with
+    | none => return Except.error "Expected loss to be defined"
+    | some lossNat =>
+      let funCode : FunCode :=
+      {
+        funName := funName,
+        code := code,
+        loss := lossNat,
+        matchData? := some <| details valueMap
+      }
       return Except.ok funCode
   catch e => return Except.error (← e.toMessageData.toString)
 
 def getNatfnDetails? (evalPoints: List (Name × Nat)) (code: String)(tailCode: String)(funName lossFunction: Name) :
-  MetaM <| Except String FunCode := do
-  let fullCode := leanBlock code.trim ++ "\n\n" ++ tailCode
-  let pairs := evalPoints
-  let names := pairs.map (·.1)
-  -- logInfo fullCode
-  -- logInfo m!"{names}"
-  try
-    let (values, logs) ← runDefsNatM fullCode (`loss :: names)
-    for msg in logs.toList do
-      if msg.severity == MessageSeverity.error then
-        logWarning msg.data
-    let loss? := values.find? lossFunction
-    match loss? with
-    | none => return Except.error "Expected loss to be defined"
-    | some lossNat =>
-      let pointErrors := pairs.filterMap <| fun (name, nat) =>
-        let value? := values.find? name
-        value?.map (fun value =>
-          Json.mkObj [("point", nat), ("error", value)])
-      let funCode : FunCode :=
-      {
-        funName := funName,
-        code := code,
-        loss := lossNat,
-        matchData? := some <| Json.arr pointErrors.toArray
-      }
-      -- logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"
-      return Except.ok funCode
-  catch e => return Except.error (← e.toMessageData.toString)
+  MetaM <| Except String FunCode :=
+  getLossDetails? (evalPoints.map (·.1)) (natDetails evalPoints)
+    code tailCode funName lossFunction
 
 def getSampleDetails? (evalPoints: List (Name × Format)) (code: String)(tailCode: String)(funName lossFunction: Name) :
-  MetaM <| Except String FunCode := do
-  let fullCode := leanBlock code.trim ++ "\n\n" ++ tailCode
-  let pairs := evalPoints
-  let names := pairs.map (·.1)
-  try
-    let (values, logs) ← runDefsNatM fullCode (`loss :: names)
-    for msg in logs.toList do
-      if msg.severity == MessageSeverity.error then
-        logWarning msg.data
-    let loss? := values.find? lossFunction
-    match loss? with
-    | none => return Except.error "Expected loss to be defined"
-    | some lossNat =>
-      let pointErrors := pairs.filterMap <| fun (name, fmt) =>
-        let value? := values.find? name
-        value?.map (fun value =>
-          Json.mkObj [("point", fmt.pretty), ("error", value)])
-      let funCode : FunCode :=
-      {
-        funName := funName,
-        code := code,
-        loss := lossNat,
-        matchData? := some <| Json.arr pointErrors.toArray
-      }
-      -- logInfo m!"{funCode.code}, {funCode.loss}, {funCode.matchData?}"
-      return Except.ok funCode
-  catch e => return Except.error (← e.toMessageData.toString)
+  MetaM <| Except String FunCode :=
+  getLossDetails? (evalPoints.map (·.1)) (evalDetails evalPoints)
+    code tailCode funName lossFunction
 
 def getAll (codes: Array String)(tailCode: String)
   (funName lossFunction : Name)
