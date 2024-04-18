@@ -75,12 +75,22 @@ def natDetails (evalPoints: List (Name × Nat))
           Json.mkObj [("point", nat), ("error", value)])
   Json.arr pointErrors.toArray
 
-def evalDetails (evalPoints: List (Name × Format))
+def evalDetails' (evalPoints: List (Name × Format))
   (valueMap: HashMap Name Nat) : Json :=
   let pointErrors := evalPoints.filterMap <| fun (name, fmt) =>
         let value? := valueMap.find? name
         value?.map (fun value =>
           Json.mkObj [("point", fmt.pretty), ("error", value)])
+  Json.arr pointErrors.toArray
+
+variable {α : Type}[ToString α]
+
+def evalDetails (evalPoints: List (Name ×  α))
+  (valueMap: HashMap Name Nat) : Json :=
+  let pointErrors := evalPoints.filterMap <| fun (name, x) =>
+        let value? := valueMap.find? name
+        value?.map (fun value =>
+          Json.mkObj [("point", toString x), ("error", value)])
   Json.arr pointErrors.toArray
 
 def getLossDetailsWithBools? (natVars: List Name)(boolVars: List Name)
@@ -120,7 +130,12 @@ def getNatfnDetails? (evalPoints: List (Name × Nat)) (code: String)(tailCode: S
   getLossDetails? (evalPoints.map (·.1)) (natDetails evalPoints)
     code tailCode funName lossFunction
 
-def getSampleDetails? (evalPoints: List (Name × Format)) (code: String)(tailCode: String)(funName lossFunction: Name) :
+def getSampleDetails?' (evalPoints: List (Name × Format)) (code: String)(tailCode: String)(funName lossFunction: Name) :
+  MetaM <| Except String FunCode :=
+  getLossDetails? (evalPoints.map (·.1)) (evalDetails' evalPoints)
+    code tailCode funName lossFunction
+
+def getSampleDetails? (evalPoints: List (Name × α)) (code: String)(tailCode: String)(funName lossFunction: Name) :
   MetaM <| Except String FunCode :=
   getLossDetails? (evalPoints.map (·.1)) (evalDetails evalPoints)
     code tailCode funName lossFunction

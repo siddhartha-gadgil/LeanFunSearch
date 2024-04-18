@@ -72,17 +72,18 @@ def withNatSample (lo hi n : Nat)
     {objective := objective, funName := funcName, tailCode := tail, lossFunction := `loss, get? := FunCode.getNatfnDetails? pairs}
   return (ev, popln.toList)
 
-def withSample (lo hi n : Nat)
-  (funcName eqnName ofNat: Name)(file: System.FilePath) :
+def withSample {α : Type}[ToString α](lo hi n : Nat)
+  (funcName eqnName ofNatName: Name)(ofNat: Nat → α)(file: System.FilePath) :
   MetaM (Evolver × (List FunCode)) := do
   let codes ← funBlocks file
   let objective ← funObjectiveBlock file
-  let (tail, pairs) ← tailCodeSample lo hi n funcName eqnName ofNat
+  let (tail, pairs) ←
+    tailCodeSample lo hi n funcName eqnName ofNatName ofNat
   let popln ←
-      FunCode.getAll codes.toArray tail funcName `loss
+      FunCode.getAll codes.toArray tail.pretty funcName `loss
         (FunCode.getSampleDetails? pairs)
   let ev : Evolver :=
-    {objective := objective, funName := funcName, tailCode := tail, lossFunction := `loss, get? := FunCode.getSampleDetails? pairs}
+    {objective := objective, funName := funcName, tailCode := tail.pretty, lossFunction := `loss, get? := FunCode.getSampleDetails? pairs}
   return (ev, popln.toList)
 
 def runAux (ev: Evolver)(popln : List FunCode)

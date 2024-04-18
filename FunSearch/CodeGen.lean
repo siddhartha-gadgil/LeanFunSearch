@@ -54,67 +54,21 @@ def sampleα (lo hi n: Nat)(sampleFn fromNat: Name) :
     let cmd ← `(command|def $sampleId  := List.map $fromNatId $rhs)
     return (← ppCommand cmd, sample)
 
-/--
-## Tail code for Nat → Nat functions: Broken version
+def sampleFull (lo hi n: Nat)(sampleFn fromNatName: Name)
+        (fromNat : Nat → α) :
+        CoreM (Format × (List (Syntax.Term × α))) := do
+    let (_, rhs, sampleNat) ← sampleNatStx lo hi n sampleFn
+    let fromNatId := mkIdent fromNatName
+    let sample ← sampleNat.mapM fun n => do
+        let n' := Syntax.mkNumLit (toString n)
+        pure (← `($fromNatId $n'), fromNat n)
+    let sampleId := mkIdent sampleFn
+    let cmd ← `(command|def $sampleId  := List.map $fromNatId $rhs)
+    return (← ppCommand cmd, sample)
 
-We have the function name, equation name and the sampling parameters as arguments.
-
-We will use the default names `loss` and `lossDetails` for the loss and the details. These will use functions from the helper.
-
-The equation is expected to take a single argument, the function. So the equation is `eqnName funcName`.
-
-We can generalize this to functions `α → β` by using the `sampleα` function for the `sampleFmt` argument and an appropriate absolute value function for `absFn`.
--/
-def sampleα' [ToString α] (lo hi n: Nat)(sampleFn: Name)(m : Nat → α) : CoreM (Format) := do
-  let sample ←  List.replicate n 0 |>.mapM fun _ => do
-    pure <| m (← IO.rand lo hi)
-  let s := sample.toString
-  let stx? := Parser.runParserCategory (← getEnv) `term s
-  match stx? with
-  | Except.ok stx =>
-    let stx : TSyntax `term := ⟨ stx ⟩
-    let lst := mkIdent `List
-    let nat := mkIdent `Nat
-    let sample := mkIdent sampleFn
-    let result ← `(command|def $sample : $lst $nat := $stx)
-    ppCommand result
-  | Except.error err =>
-    throwError m!"{err}"
-
-#eval (sampleα'  0 100 10 `sample Nat.toFloat)
-
-
-
-def tailCodeFmt' (lo hi n : Nat)(funcName eqnName: Name)
-    (sampleFmt : CoreM (Format × List Nat) := sampleNats lo hi n `sample)
-    (absFn : Name := ``natAbs):
-    CoreM Format := do
-    let sample := mkIdent `sample
-    let lossFn := mkIdent `loss
-    let eqnId := mkIdent eqnName
-    let funcId := mkIdent funcName
-    let sampleLossFn := mkIdent ``sampleLoss
-    let lossDetailsFn := mkIdent `lossDetails
-    let sampleLossDetailsFn := mkIdent ``sampleLossDetails
-    let eqn ← `($eqnId $funcId)
-    let m := mkIdent absFn
-    let lossStx ←
-        `(command| def $lossFn := $sampleLossFn $eqn $funcId $m $sample)
-    let lossDetailsStx ←
-        `(command| def $lossDetailsFn := $sampleLossDetailsFn $eqn $funcId $m $sample)
-    let fmt := Format.joinSep
-        [(← sampleFmt).1, ← ppCommand lossStx, ← ppCommand lossDetailsStx] (Format.line ++ Format.line)
-    return fmt
-
-def tailCode'(lo hi n : Nat)(funcName eqnName: Name)
-    (sampleFmt : CoreM (Format × List Nat) := sampleNats lo hi n `sample)
-    (absFn : Name := ``natAbs):
-    CoreM String := do
-    let fmt ← tailCodeFmt' lo hi n funcName eqnName sampleFmt absFn
-    return fmt.pretty
 
 /--
-## Tail code for Nat → Nat functions
+## Tail code for Nat → Nat functions and generalizations
 
 We have the function name, equation name and the sampling parameters as arguments.
 
@@ -189,15 +143,46 @@ def tailCodeSampleFmt (lo hi n : Nat)(funcName eqnName ofNat: Name)
         commands.toList (Format.line ++ Format.line)
     return (fmt, namePairs.toList)
 
-def tailCodeSample (lo hi n : Nat)(funcName eqnName ofNat: Name)
+def tailCodeSample (lo hi n : Nat)(funcName eqnName ofNatName: Name)
+    (ofNat : Nat → α)(sampleFmt :
+        CoreM (Format × List (Syntax.Term × α)) :=
+        sampleFull  lo hi n `sample ofNatName ofNat):
+    CoreM (Format × List (Name  × α)) := do
+    let sampleId := mkIdent `sample
+    let lossFn := mkIdent `loss
+    let eqnId := mkIdent eqnName
+    let funcId := mkIdent funcName
+    let sampleLossFn := mkIdent ``sampleLossNat
+    let eqn ← `($eqnId $funcId)
+    let nat := mkIdent `Nat
+    let lossStx ←
+        `(command| def $lossFn : $nat := $sampleLossFn $eqn $sampleId)
+    let lossFmt ← ppCommand lossStx
+    let mut commands := #[(← sampleFmt).1, lossFmt]
+    let mut namePairs : Array (Name × α) := #[]
+    let mut i := 0
+    for (jval, x) in (← sampleFmt).2 do
+        let name := s!"lossDataPoint_{i}".toName
+        let nameId := mkIdent name
+        namePairs := namePairs.push (name, x)
+        let cmd ← `(command| def $nameId : $nat := $eqn $jval)
+        commands := commands.push (← ppCommand cmd)
+        i := i + 1
+    let fmt := Format.joinSep
+        commands.toList (Format.line ++ Format.line)
+    return (fmt, namePairs.toList)
+
+
+
+def tailCodeSample' (lo hi n : Nat)(funcName eqnName ofNat: Name)
     (sampleFmt : CoreM (Format × List Syntax.Term) :=
         sampleα  lo hi n `sample ofNat):
     CoreM (String × List (Name × Format)) := do
     let (fmt, pairs) ← tailCodeSampleFmt lo hi n funcName eqnName ofNat sampleFmt
     return (fmt.pretty, pairs)
 
-#eval tailCodeSample 1 100 7 `fn `fnEqn ``Int.ofNat
-
+#eval tailCodeSample' 1 100 7 `fn `fnEqn ``Int.ofNat
+#eval tailCodeSample 1 100 7 `fn `fnEqn ``Int.ofNat Int.ofNat
 
 /-!
 Other code generation. Currently not used.
