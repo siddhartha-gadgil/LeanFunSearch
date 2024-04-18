@@ -92,13 +92,19 @@ def response : MetaM Json := do
 
 -- #eval response
 
-def egEvolve := Evolver.withNatSample 0 100 12 ``fn ``fnEqnNat "FunSearch/Examples/SimpleNat.lean"
+def egEvolve := Evolver.withNatSample 0 100 12 `fn ``fnEqnNat "FunSearch/Examples/SimpleNat.lean"
 
 def egObj : MetaM String := do
   return (← egEvolve).1.objective
 
 def egTailCode : MetaM String := do
   return (← egEvolve).1.tailCode
+
+def egPop : MetaM (List FunCode) := do
+  let (_, pop) := (← egEvolve)
+  return pop
+
+#eval egPop
 
 #check egEvolve
 #eval egObj
@@ -108,6 +114,6 @@ def egStep : MetaM (List FunCode) := do
   let (ev, pop) := (← egEvolve)
   ev.step pop
 
-#eval egStep
+-- #eval egStep
 
 end funsearch

@@ -153,7 +153,7 @@ def getAll (codes: Array String)(tailCode: String)
     | Except.error e =>
       appendLog "elab_errors" <|
         Json.mkObj [("error", e), ("code", code), ("funName", funName.toString), ("tailCode", tailCode)]
-      logError <| "e" ++ "\nin" ++ code ++ "\n\n" ++ tailCode
+      logError <| e ++ "\nin" ++ code ++ "\n\n" ++ tailCode
       pure ()
     | Except.ok funCode => funCodes := funCodes.push funCode
   return funCodes

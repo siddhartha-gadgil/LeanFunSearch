@@ -1,4 +1,5 @@
 import Lean
+import FunSearch.Aides
 
 
 open Lean Meta Elab Parser
@@ -9,6 +10,7 @@ Code from Lean 4 copied, simplified and customized. The main change is that inst
 
 In the `runFrontendM` and other related functions the environment is modified if the `modifyEnv` flag is set to true.
 -/
+namespace funsearch
 
 def simpleRunFrontend
     (input : String)
@@ -62,10 +64,28 @@ def runDefsExprM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM 
 
 def runDefsNatM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM (HashMap Name Nat × MessageLog) := do
   let prevEnv ← getEnv
-  let (_, logs) ← runFrontendM s true
+  let (env, logs) ← runFrontendM s true
+  let lossExpr? := env.constants.map₁.find? `loss |>.map (·.value!)
+  let lf? ← lossExpr?.mapM (ppExpr)
+  let ls?' := lf?.map (·.pretty)
   let pairs : List (Name × Nat) ←
     names.mapM <| fun n => do pure (n, ← reduceNatNative n)
   if !modifyEnv then setEnv prevEnv
+  -- logInfo m!"Pairs: {pairs}"
+  -- let envNames :=
+  --   env.constants.map₁.toList.map (·.1) |>.filter (`funsearch).isPrefixOf
+  let lossExpr? := env.constants.map₁.find? `loss |>.map (·.value!)
+  let lf? ← lossExpr?.mapM (ppExpr)
+  let ls? := lf?.map (·.pretty)
+  appendLog "losses" <|
+    Json.mkObj [("code", s), ("pairs", toJson pairs),
+    ("loss", toJson ls?), ("loss'", toJson ls?'),
+    -- ("environment-names", toJson envNames),
+    ("logs", toJson (← logs.toList.mapM  (·.data.toString)))]
+  for log in logs.toList do
+    if log.severity == MessageSeverity.error then
+      throwError log.data
+  logInfo "Checked logs for errors"
   return (HashMap.ofList pairs, logs)
 
 def runDefsBoolM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM (HashMap Name Bool × MessageLog) := do
@@ -118,3 +138,5 @@ def egNatNative : MetaM Nat := do
   return n
 
 #eval egNatNative
+
+end funsearch
