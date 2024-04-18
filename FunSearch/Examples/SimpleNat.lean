@@ -1,5 +1,7 @@
 import FunSearch.CodeGen
 import FunSearch.FunCode
+import FunSearch.FunEvolve
+import Mathlib
 
 /-!
 We have some simple functions `Nat → Nat`
@@ -79,5 +81,23 @@ def response : MetaM Json := do
   return response
 
 -- #eval response
+
+def egEvolve := Evolver.withNatSample 0 100 12 `fn ``fnEqnNat "FunSearch/Examples/SimpleNat.lean"
+
+def egObj : MetaM String := do
+  return (← egEvolve).1.objective
+
+def egTailCode : MetaM String := do
+  return (← egEvolve).1.tailCode
+
+#check egEvolve
+#eval egObj
+#eval egTailCode
+
+def egStep : MetaM (List FunCode) := do
+  let (ev, pop) := (← egEvolve)
+  ev.step pop
+
+-- #eval egStep
 
 end funsearch

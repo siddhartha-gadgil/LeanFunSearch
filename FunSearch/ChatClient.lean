@@ -91,8 +91,10 @@ def query (server: ChatServer)(messages : Json)(params : ChatParams) : CoreM Jso
     panic! s!"Error parsing JSON: {e}; source: {output}"
 
 def stringsFromJson (json: Json) : CoreM (Array String) := do
+  match json.getObjVal? "choices" with
+  | Except.ok js =>
   let outArr : Array String ←
-    match json.getArr? with
+    match js.getArr? with
     | Except.ok arr =>
         let parsedArr : Array String ←
           arr.filterMapM <| fun js =>
@@ -108,9 +110,12 @@ def stringsFromJson (json: Json) : CoreM (Array String) := do
                   throwError m!"no content field in {jsobj}"
             | Except.error _ =>
                 throwError m!"no message field in {js}"
-
         pure parsedArr
-    | Except.error e => throwError m!"json parsing error: {e}"
+    | Except.error e =>
+      throwError m!"json parsing error: {e} when getting array from {js}"
+  | Except.error e =>
+    throwError m!"json parsing error: {e} when getting choices field from {json}"
+
 
 def queryTextsForMessages (server: ChatServer)(messages : Json)
     (params : ChatParams) : CoreM <| Array String := do

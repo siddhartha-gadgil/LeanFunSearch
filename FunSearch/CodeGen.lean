@@ -114,35 +114,6 @@ def tailCodeNat (lo hi n : Nat)(funcName eqnName: Name)
 
 #eval tailCodeNat 1 100 7 `fn `fnEqn
 
-def tailCodeSampleFmt (lo hi n : Nat)(funcName eqnName ofNat: Name)
-    (sampleFmt : CoreM (Format × List Syntax.Term) :=
-        sampleα  lo hi n `sample ofNat):
-    CoreM (Format × List (Name × Format)) := do
-    let sampleId := mkIdent `sample
-    let lossFn := mkIdent `loss
-    let eqnId := mkIdent eqnName
-    let funcId := mkIdent funcName
-    let sampleLossFn := mkIdent ``sampleLossNat
-    let eqn ← `($eqnId $funcId)
-    let nat := mkIdent `Nat
-    let lossStx ←
-        `(command| def $lossFn : $nat := $sampleLossFn $eqn $sampleId)
-    let lossFmt ← ppCommand lossStx
-    let mut commands := #[(← sampleFmt).1, lossFmt]
-    let mut namePairs : Array (Name × Format) := #[]
-    let mut i := 0
-    for jval in (← sampleFmt).2 do
-        let name := s!"lossDataPoint_{i}".toName
-        let nameId := mkIdent name
-        let p ← PrettyPrinter.ppTerm jval
-        namePairs := namePairs.push (name, p)
-        let cmd ← `(command| def $nameId : $nat := $eqn $jval)
-        commands := commands.push (← ppCommand cmd)
-        i := i + 1
-    let fmt := Format.joinSep
-        commands.toList (Format.line ++ Format.line)
-    return (fmt, namePairs.toList)
-
 def tailCodeSample (lo hi n : Nat)(funcName eqnName ofNatName: Name)
     (ofNat : Nat → α)(sampleFmt :
         CoreM (Format × List (Syntax.Term × α)) :=
@@ -173,15 +144,6 @@ def tailCodeSample (lo hi n : Nat)(funcName eqnName ofNatName: Name)
     return (fmt, namePairs.toList)
 
 
-
-def tailCodeSample' (lo hi n : Nat)(funcName eqnName ofNat: Name)
-    (sampleFmt : CoreM (Format × List Syntax.Term) :=
-        sampleα  lo hi n `sample ofNat):
-    CoreM (String × List (Name × Format)) := do
-    let (fmt, pairs) ← tailCodeSampleFmt lo hi n funcName eqnName ofNat sampleFmt
-    return (fmt.pretty, pairs)
-
-#eval tailCodeSample' 1 100 7 `fn `fnEqn ``Int.ofNat
 #eval tailCodeSample 1 100 7 `fn `fnEqn ``Int.ofNat Int.ofNat
 
 /-!
