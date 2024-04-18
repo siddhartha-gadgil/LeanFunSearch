@@ -83,14 +83,15 @@ def evalDetails (evalPoints: List (Name × Format))
           Json.mkObj [("point", fmt.pretty), ("error", value)])
   Json.arr pointErrors.toArray
 
-def getLossDetails? (natVars: List Name)
-  (details : HashMap Name Nat → Json)
+def getLossDetailsWithBools? (natVars: List Name)(boolVars: List Name)
+  (details : HashMap Name Nat → HashMap Name Bool →  Json)
   (code: String)(tailCode: String)(funName lossFunction: Name) :
   MetaM <| Except String FunCode := do
   let fullCode := leanBlock code.trim ++ "\n\n" ++ tailCode
   try
     let (valueMap, logs) ← runDefsNatM fullCode (lossFunction :: natVars)
-    for msg in logs.toList do
+    let (boolMap, logs') ← runDefsBoolM fullCode boolVars
+    for msg in (logs ++ logs').toList do
       if msg.severity == MessageSeverity.error then
         logWarning msg.data
     let loss? := valueMap.find? lossFunction
@@ -102,10 +103,17 @@ def getLossDetails? (natVars: List Name)
         funName := funName,
         code := code,
         loss := lossNat,
-        matchData? := some <| details valueMap
+        matchData? := some <| details valueMap boolMap
       }
       return Except.ok funCode
   catch e => return Except.error (← e.toMessageData.toString)
+
+def getLossDetails? (natVars: List Name)
+  (details : HashMap Name Nat → Json)
+  (code: String)(tailCode: String)(funName lossFunction: Name) :
+  MetaM <| Except String FunCode :=
+  getLossDetailsWithBools? natVars [] (fun natMap _ => details natMap)
+    code tailCode funName lossFunction
 
 def getNatfnDetails? (evalPoints: List (Name × Nat)) (code: String)(tailCode: String)(funName lossFunction: Name) :
   MetaM <| Except String FunCode :=

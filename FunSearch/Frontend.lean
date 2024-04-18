@@ -68,6 +68,14 @@ def runDefsNatM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM (
   if !modifyEnv then setEnv prevEnv
   return (HashMap.ofList pairs, logs)
 
+def runDefsBoolM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM (HashMap Name Bool × MessageLog) := do
+  let prevEnv ← getEnv
+  let (_, logs) ← runFrontendM s true
+  let pairs : List (Name × Bool) ←
+    names.mapM <| fun n => do pure (n, ← reduceBoolNative n)
+  if !modifyEnv then setEnv prevEnv
+  return (HashMap.ofList pairs, logs)
+
 def runDefsViewM(s: String)(names: List Name)(modifyEnv: Bool := false) : MetaM (HashMap Name String × MessageLog) := do
   let (vals, logs) ← runDefsExprM s names modifyEnv
   let fmts ← vals.toList.mapM fun (n, val) => do
