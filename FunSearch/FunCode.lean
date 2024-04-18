@@ -21,7 +21,7 @@ def formatLines (lines: List String) : String :=
 namespace FunCode
 
 def goal (objective: String) : String :=
-  s!"{objective}\n\nThe extent to which the objective is satisfied will be measured by a **loss** function, which you must minimize.\n\nGive ONLY the code in Lean."
+  s!"{objective}\n\nThe extent to which the objective is satisfied will be measured by a **loss** function, which you must minimize.\n\nGive ONLY the code in **Lean 4**."
 
 def report (funCode: FunCode) (objective: String) : String :=
   let loss := s!"The code you gave was to minimize the loss of the function {funCode.funName}, which measured how well the function satisfied:\n {objective}. \n\n## Loss: For the code you gave, the **loss** was {funCode.loss}."

@@ -16,25 +16,35 @@ Find a function `fn: Nat → Nat` that satisfies $f(n+ 1)^2 = f(n)^2 + 4n + 8$.
 -/
 namespace eg1
 
--- <funsearch>
+-- start-funsearch
 def fn (n : Nat) : Nat := n + 1
--- </funsearch>
+-- end-funsearch
 
 end eg1
 
 namespace eg2
--- <funsearch>
+-- start-funsearch
 def fn (n : Nat) : Nat := n * 2
--- </funsearch>
+-- end-funsearch
 end eg2
 
 namespace collatz
 
--- <funsearch hard>
+-- start-funsearch hard
 def fn (n: Nat) : Nat := if n % 2 = 0 then n / 2 else 3 * n + 1
--- </funsearch>
+-- end-funsearch
 
 end collatz
+
+namespace recursive
+
+-- start-funsearch
+def fn : Nat → Nat
+| 0 => 3
+| n + 1 => fn n + 2
+-- end-funsearch
+
+end recursive
 
 namespace funsearch
 
@@ -98,6 +108,6 @@ def egStep : MetaM (List FunCode) := do
   let (ev, pop) := (← egEvolve)
   ev.step pop
 
--- #eval egStep
+#eval egStep
 
 end funsearch
