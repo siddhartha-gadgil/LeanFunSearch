@@ -20,6 +20,8 @@ structure Evolver extends CodeParams where
   t : Float := 0.8
   get? : String → String → Name → Name →
     MetaM (Except String FunCode) := FunCode.getLoss?
+  goal: String → String := FunCode.goal
+  report : FunCode → String → String := FunCode.report
 namespace Evolver
 
 def step (ev: Evolver)(popln : List FunCode) :
@@ -27,6 +29,7 @@ def step (ev: Evolver)(popln : List FunCode) :
   let sample ← pickByLoss popln (fun code ↦ code.loss.toFloat) ev.n ev.t
   let messages :=
     FunCode.messages ev.server ev.objective sample.toArray
+      ev.goal ev.report
   let response ← ev.server.query messages ev.params
   let outputs ←  ChatServer.stringsFromJson response
   let newCodes ←

@@ -174,7 +174,9 @@ def getAllIO (codes: IO (List String))
   getAllNatFn codes.toArray (← tailCode).1 (← tailCode).2 funName lossFunction
 
 def messages (server: ChatServer)(objective: String)
-  (funCodes: Array FunCode) : Json :=
+  (funCodes: Array FunCode)
+  (goal: String → String:= goal)
+  (report: FunCode → String → String := report) : Json :=
   let goalMessage := goal objective
   let (msgs, report?) := funCodes.foldl (fun (acc, report?) funCode =>
     let prevReport :=
