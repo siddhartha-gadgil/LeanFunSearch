@@ -16,7 +16,7 @@ structure Evolver extends CodeParams where
   tailCode : String
   server : ChatServer := ChatServer.azure
   params : ChatParams := {n := 3}
-  n : Nat := 3
+  n : Nat := 5
   t : Float := 0.8
   get? : String → String → Name → Name →
     MetaM (Except String FunCode) := FunCode.getLoss?

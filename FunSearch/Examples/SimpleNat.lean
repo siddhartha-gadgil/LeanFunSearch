@@ -8,7 +8,7 @@ We have some simple functions `Nat → Nat`
 
 ## FunObjective
 
-Find a function `fn: Nat → Nat` that satisfies $f(n+ 1)^2 = f(n)^2 + 4n + 8$.
+Find a function `fn: Nat → Nat` that satisfies $2 * f(n + 2) = f(n + 1) + f(n) + 6n + 13$.
 
 ## EndObjective
 
@@ -28,9 +28,21 @@ def fn (n : Nat) : Nat := n * 2
 -- end-funsearch
 end eg2
 
+namespace eg3
+-- start-funsearch
+def fn (n : Nat) : Nat := n * n
+-- end-funsearch
+end eg3
+
+namespace eg5
+-- start-funsearch
+def fn (n : Nat) : Nat := n * (n + 1) * (n + 2) + 7
+-- end-funsearch
+end eg5
+
 namespace collatz
 
--- start-funsearch hard
+-- start-funsearch
 def fn (n: Nat) : Nat := if n % 2 = 0 then n / 2 else 3 * n + 1
 -- end-funsearch
 
@@ -48,12 +60,10 @@ end recursive
 
 namespace funsearch
 
-def fnEqn (f: Nat → Nat) : Nat → Float :=
-  fun n ↦ (f (n + 1) * f (n + 1) - (f (n) * f (n)) - 4 * n - 4).toFloat
 
 def fnEqnNat (f: Nat → Nat) : Nat → Nat :=
-  fun n ↦ Int.natAbs
-    (f (n + 1) * f (n + 1) : Int) - ((f (n) * f (n)) - 4 * n - 8)
+  fun n ↦ Int.natAbs <|
+    (2 * f (n + 2) : Int) - ((f (n + 1) + f n + 6 * n + 13) : Int)
 
 
 def codeHeads : IO <| List String :=
