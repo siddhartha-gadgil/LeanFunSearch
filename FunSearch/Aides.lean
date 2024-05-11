@@ -106,6 +106,9 @@ def funObjectiveBlock (path: System.FilePath) : IO (String) := do
   let blocks := enclosedLines' "## FunObjective" "## EndObjective" lines.toList
   return blocks.foldl (fun s1 s2 => s1 ++ "\n" ++ s2) "" |>.trim
 
+def bestLoss (objective: IO String) : IO String := do
+  return s!"${← objective}\n\nThis objective may be hard or impossible. Nevertheless, give code to try to match it as closely as possible, by minimizing the **loss**."
+
 #eval enclosedLines "<funtail>" "</funtail>" ["import", "-- <funtail>", "a", "b", "-- </funtail>", "c", "-- <funtail>", "d", "-- </funtail>", "e"]
 
 #eval funBlocks "FunSearch/Examples/SimpleNat.lean" "hard"

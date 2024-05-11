@@ -69,7 +69,8 @@ def fnEqnNat (f: Nat → Nat) : Nat → Nat :=
 def codeHeads : IO <| List String :=
   funBlocks "FunSearch/Examples/SimpleNat.lean"
 
-def objective := funObjectiveBlock "FunSearch/Examples/SimpleNat.lean"
+def objective := bestLoss <|
+  funObjectiveBlock "FunSearch/Examples/SimpleNat.lean"
 
 #eval codeHeads
 

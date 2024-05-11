@@ -57,6 +57,9 @@ def authHeader? : ChatServer → IO (Option String)
   | generic .. =>
     return none
 
+def mistralLocal : ChatServer :=
+  .generic (model:="mistralai/Mistral-7B-Instruct-v0.2") "http://localhost:8000/v1" false
+
 def query (server: ChatServer)(messages : Json)(params : ChatParams) : CoreM Json := do
   let dataJs := Json.mkObj [("model", server.model), ("messages", messages)
   , ("temperature", Json.num params.temp), ("n", params.n), ("max_tokens", params.max_tokens),
