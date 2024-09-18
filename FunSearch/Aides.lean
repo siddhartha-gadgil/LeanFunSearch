@@ -3,7 +3,7 @@ import Lean.Meta
 import Lean.Elab
 import Lean.Parser
 import Lean.Parser.Extension
-import Std.Data.List.Basic
+import Batteries.Data.List.Basic
 
 open Lean Meta Elab Parser Tactic
 

@@ -3,7 +3,7 @@ import FunSearch.Aides
 
 
 open Lean Meta Elab Parser
-open Std
+open Batteries
 
 /-!
 Code from Lean 4 copied, simplified and customized. The main change is that instead of parsing the imports the current environment is used. In the entry point `simpleRunFrontend` the environment is passed as an argument.
