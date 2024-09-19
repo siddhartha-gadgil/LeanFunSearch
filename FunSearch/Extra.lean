@@ -1,5 +1,5 @@
 import Mathlib.Tactic
-import LeanSearchClient.LoogleSyntax
+-- import LeanSearchClient.LoogleSyntax
 
 #check Nat.Primes.infinite
 
